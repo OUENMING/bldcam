@@ -49,7 +49,7 @@ fi
 
 # 3) Delete + restart PM2 (forces fresh env reload, restart alone caches old env)
 pm2 delete bldcam 2>/dev/null || true
-pm2 start ecosystem.config.cjs
+pm2 start server.js --name bldcam
 pm2 save
 
 echo "  ✓ App restarted with fresh env"

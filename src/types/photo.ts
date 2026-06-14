@@ -1,0 +1,36 @@
+export interface PhotoData {
+  id: string;
+  url: string;
+  thumbnailUrl?: string | null;
+  blurDataUrl?: string | null;
+  fileSize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  aspectRatio?: number | null;
+  title: string;
+  description: string;
+  make?: string | null;
+  model?: string | null;
+  lensModel?: string | null;
+  focalLength?: number | null;
+  focalLength35mm?: number | null;
+  fNumber?: number | null;
+  iso?: number | null;
+  exposureTime?: number | null;
+  exposureCompensation?: number | null;
+  dateTimeOriginal?: Date | null;
+  gpsAltitude?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  country?: string | null;
+  countryCode?: string | null;
+  region?: string | null;
+  city?: string | null;
+  district?: string | null;
+  fullAddress?: string | null;
+  placeFormatted?: string | null;
+  isFavorite: boolean;
+  rating: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
