@@ -8,7 +8,7 @@ export function Header() {
   const { mode, toggle } = useViewMode();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-black px-4 backdrop-blur-sm sm:px-6 md:px-8">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-black px-4 pt-[env(safe-area-inset-top,0px)] backdrop-blur-sm sm:px-6 md:px-8">
       {/* ── Left: Brand ──────────────────────────── */}
       <Link href="/" className="flex items-center gap-2.5 group">
         <Aperture

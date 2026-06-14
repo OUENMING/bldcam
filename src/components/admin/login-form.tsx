@@ -42,7 +42,7 @@ export function LoginForm() {
       <Card className="w-full max-w-sm shadow-xl">
         <CardHeader>
           <CardTitle className="text-center tracking-tight">
-            Console
+            BLDcam
           </CardTitle>
         </CardHeader>
         <CardContent>

@@ -117,7 +117,7 @@ export function CitySidebar({
           </Link>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-4 pb-8 space-y-4">
+        <nav className="flex-1 overflow-y-auto px-4 pb-8 space-y-4" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))" }}>
           {/* ══════════════════════════════════════════ */}
           {/* ── 城市 ───────────────────────────────── */}
           {/* ══════════════════════════════════════════ */}

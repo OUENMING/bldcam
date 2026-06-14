@@ -126,7 +126,7 @@ export function PhotoMap({ photos }: PhotoMapProps) {
   }, []);
 
   return (
-    <div className="relative h-[calc(100svh-4rem)] w-full">
+    <div className="relative h-[calc(100svh-4rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] w-full">
       <Map
         initialViewState={{
           longitude: 104,
@@ -153,6 +153,13 @@ export function PhotoMap({ photos }: PhotoMapProps) {
                 <div
                   onMouseEnter={() => handleMouseEnter(photo)}
                   onMouseLeave={handleMouseLeave}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Toggle: tap same marker again to close
+                    setHovered((prev) =>
+                      prev?.id === photo.id ? null : photo,
+                    );
+                  }}
                 >
                   <DotMarker />
                 </div>

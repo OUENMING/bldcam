@@ -41,18 +41,18 @@ export function AdminConsole({ initialPhotos }: AdminConsoleProps) {
   return (
     <div className="min-h-screen bg-black">
       {/* ── Header — aligns with front-end Header ─── */}
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-black px-4 sm:px-6 md:px-8">
-        {/* Left: Brand */}
-        <div className="flex items-center gap-2.5">
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-black px-4 pt-[env(safe-area-inset-top,0px)] sm:px-6 md:px-8">
+        {/* Left: Brand — always goes to front gallery */}
+        <a href="/" className="flex items-center gap-2.5">
           <Aperture
             className="size-6 text-white"
             strokeWidth={2.25}
             absoluteStrokeWidth
           />
           <span className="font-serif font-bold text-white text-xl tracking-wide">
-            Console
+            BLDcam
           </span>
-        </div>
+        </a>
 
         {/* Right: Capsule bar */}
         <div className="flex items-center gap-x-3 rounded-full bg-zinc-900 px-4 py-2">

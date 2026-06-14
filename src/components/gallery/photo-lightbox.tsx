@@ -29,6 +29,9 @@ interface ExifSlide {
   dateTimeOriginal: Date | null;
   latitude: number | null;
   longitude: number | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
 }
 
 // ── Custom Slide Render ─────────────────────────
@@ -67,6 +70,10 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
       ? formatGps(slide.latitude, slide.longitude)
       : null;
 
+  const location = [slide.city, slide.region, slide.country]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <div className="relative flex h-full w-full items-center justify-center">
       <Image
@@ -86,7 +93,7 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
       />
 
       {/* ── EXIF overlay ──────────────────────── */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/80 px-4 pb-4 pt-10 text-center md:px-6">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/80 px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-10 text-center md:px-6">
         <h2 className="mb-0.5 font-semibold text-white text-sm drop-shadow-md">
           {slide.title}
         </h2>
@@ -108,7 +115,11 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
             ))}
           </div>
         )}
-        {gps && <p className="mt-0.5 text-gray-500 text-xs">{gps}</p>}
+        {(location || gps) && (
+          <p className="mt-0.5 text-gray-500 text-xs">
+            {location || gps}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -152,6 +163,9 @@ export function PhotoLightbox({
         dateTimeOriginal: p.dateTimeOriginal,
         latitude: p.latitude,
         longitude: p.longitude,
+        city: p.city,
+        region: p.region,
+        country: p.country,
       })),
     [photos],
   );

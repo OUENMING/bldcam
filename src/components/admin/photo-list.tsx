@@ -256,7 +256,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
                       <h3 className="font-medium text-sm text-zinc-200 leading-snug line-clamp-1">
                         {photo.title}
                       </h3>
-                      <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="flex shrink-0 gap-0.5 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100">
                         {/* Edit button */}
                         <button
                           type="button"

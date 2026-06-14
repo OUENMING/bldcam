@@ -12,6 +12,40 @@ interface UseImageDisplaySizeOptions {
   maxHeightRatio?: number;
 }
 
+// ── Singleton resize listener (debounced, one global handler) ──
+
+function getViewport(): { width: number; height: number } {
+  if (typeof window === "undefined") return { width: 0, height: 0 };
+  return { width: window.innerWidth, height: window.innerHeight };
+}
+
+type ResizeCb = () => void;
+const _resizeCbs = new Set<ResizeCb>();
+let _resizeTimer: ReturnType<typeof setTimeout> | null = null;
+
+function _notifyResize() {
+  for (const cb of _resizeCbs) cb();
+}
+
+function _onResize() {
+  if (_resizeTimer) clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(_notifyResize, 120);
+}
+
+function subscribeResize(cb: ResizeCb): () => void {
+  _resizeCbs.add(cb);
+  if (_resizeCbs.size === 1) {
+    window.addEventListener("resize", _onResize);
+  }
+  return () => {
+    _resizeCbs.delete(cb);
+    if (_resizeCbs.size === 0) {
+      window.removeEventListener("resize", _onResize);
+      if (_resizeTimer) clearTimeout(_resizeTimer);
+    }
+  };
+}
+
 /**
  * Calculate the optimal display size for a photo so it:
  * - Never exceeds a viewport-height ratio (responsive to screen size)
@@ -32,18 +66,13 @@ export function useImageDisplaySize(
 ) {
   const { maxHeightRatio } = options;
 
-  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  // Initialise synchronously from window.innerWidth/Height — no CLS
+  const [viewport, setViewport] = useState(getViewport);
 
+  // Subscribe to the singleton resize listener
   useEffect(() => {
-    const update = () => {
-      setViewport({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    const sync = () => setViewport(getViewport());
+    return subscribeResize(sync);
   }, []);
 
   const displaySize: DisplaySize = useMemo(() => {
