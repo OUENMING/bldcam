@@ -1,0 +1,58 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Photo {
+  id          String   @id @default(cuid())
+  url         String
+  thumbnailUrl String?
+  blurDataUrl String?
+  fileSize    Int?
+  width       Int
+  height      Int
+
+  // Basic metadata
+  title       String
+  description String   @default("")
+
+  // EXIF data
+  make              String?
+  model             String?
+  lensModel         String?
+  focalLength       Float?
+  focalLength35mm   Float?
+  fNumber           Float?
+  iso               Int?
+  exposureTime      Float?
+  exposureCompensation Float?
+  dateTimeOriginal  DateTime?
+  gpsAltitude       Float?
+
+  // Location
+  latitude      Float?
+  longitude     Float?
+  country       String?
+  countryCode   String?
+  region        String?
+  city          String?
+  district      String?
+  fullAddress   String?
+  placeFormatted String?
+
+  // Status
+  isFavorite  Boolean  @default(false)
+  rating      Int      @default(0)
+
+  // AI metadata (silently stored for future use)
+  category    String?
+  tags        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
