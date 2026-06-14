@@ -29,31 +29,32 @@ rsync -avz --delete \
   -e "ssh -p $PORT -i $SSH_KEY" \
   "$DIST/" "$VPS:/home/bldcam/"
 
-echo "🔧 Rebuilding native modules for Linux + replacing Next.js cache..."
-ssh -p "$PORT" -i "$SSH_KEY" "$VPS" '
-cd /home/bldcam
+echo "🔧 Uploading setup script + triggering remote install..."
+scp -P "$PORT" -i "$SSH_KEY" vps-setup.sh "$VPS:/home/bldcam/"
 
-# 1) Install Linux sharp in node_modules
-rm -rf node_modules/sharp
-npm install --force --platform=linux --arch=x64 sharp@0.35.1
+# Fire-and-forget: nohup survives SSH disconnect
+ssh -p "$PORT" -i "$SSH_KEY" "$VPS" \
+  "nohup bash /home/bldcam/vps-setup.sh > /tmp/bldcam-deploy.log 2>&1 &"
 
-# 2) Replace macOS sharp in Next.js external cache with Linux binaries
-SHARP_CACHE=$(ls -d .next/node_modules/sharp-* 2>/dev/null | head -1)
-if [ -n "$SHARP_CACHE" ]; then
-  rm -rf "$SHARP_CACHE/build" "$SHARP_CACHE/vendor" "$SHARP_CACHE/install" 2>/dev/null
-  cp -r node_modules/sharp/build "$SHARP_CACHE/" 2>/dev/null || true
-  cp -r node_modules/sharp/vendor "$SHARP_CACHE/" 2>/dev/null || true
-  cp -r node_modules/sharp/install "$SHARP_CACHE/" 2>/dev/null || true
-  echo "sharp cache replaced → $SHARP_CACHE"
-fi
-
-# 3) Delete + restart PM2 (forces fresh env reload, restart alone caches old env)
-pm2 delete bldcam 2>/dev/null || true
-pm2 start server.js --name bldcam
-pm2 save
-
-echo "  ✓ App restarted with fresh env"
-'
+# Poll until PM2 shows the new process online (max 120s)
+echo "⏳ Waiting for PM2 restart..."
+for i in $(seq 1 24); do
+  sleep 5
+  STATUS=$(ssh -p "$PORT" -i "$SSH_KEY" "$VPS" \
+    "pm2 jlist 2>/dev/null" 2>/dev/null | \
+    python3 -c "
+import json,sys
+apps=json.load(sys.stdin)
+bldcam=[a for a in apps if a.get('name')=='bldcam']
+if bldcam: print(bldcam[0].get('pm2_env',{}).get('status','unknown'))
+else: print('missing')
+" 2>/dev/null)
+  if [ "$STATUS" = "online" ]; then
+    echo "  ✓ PM2 online after $((i*5))s"
+    break
+  fi
+  echo "  ...${STATUS:-checking} ($((i*5))s)"
+done
 
 echo ""
 echo "✅ Deploy complete — https://bldcam.page"
