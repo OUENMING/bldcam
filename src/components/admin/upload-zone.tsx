@@ -86,7 +86,7 @@ async function fetchAiSuggestion(file: File): Promise<{
   formData.append("file", file);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
+  const timeout = setTimeout(() => controller.abort(), 35_000);
 
   try {
     const res = await fetch("/api/photos/suggest", {
@@ -181,10 +181,12 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
 
       setQueue((prev) => [...prev, ...entries]);
 
-      // Fire-and-forget AI
-      entries.forEach((entry) => {
-        suggestForEntry(entry.id, entry.file);
-      });
+      // Fire-and-forget AI (serial — one at a time to avoid rate limits)
+      (async () => {
+        for (const entry of entries) {
+          await suggestForEntry(entry.id, entry.file);
+        }
+      })();
     },
     [suggestForEntry],
   );

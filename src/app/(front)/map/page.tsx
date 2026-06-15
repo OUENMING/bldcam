@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { PhotoMap } from "@/features/map/map-loader";
 
+export const dynamic = "force-dynamic";
+
 export default async function MapPage() {
   const photos = await prisma.photo.findMany({
     where: {
