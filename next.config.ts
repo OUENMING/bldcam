@@ -12,11 +12,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "**.r2.cloudflarestorage.com",
       },
-      // Add custom domain if using one for R2
-      // {
-      //   protocol: "https",
-      //   hostname: "cdn.yourdomain.com",
-      // },
+      {
+        protocol: "https",
+        hostname: "cdn.bldcam.page",
+      },
     ],
   },
 };
