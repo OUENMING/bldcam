@@ -82,13 +82,20 @@ export async function deleteFromR2(keys: string[]): Promise<void> {
 /**
  * Extract the R2 object key from a public URL.
  *
+ * Supports both old (pub-xxx.r2.dev) and new (cdn.bldcam.page) URL formats.
  * e.g. "https://pub-xxx.r2.dev/photos/2026/06/uuid.webp"
  *   → "photos/2026/06/uuid.webp"
- *
- * Returns null if the URL doesn't match the configured public host.
  */
 export function extractKeyFromUrl(url: string): string | null {
-  if (!R2_PUBLIC_URL || !url.startsWith(R2_PUBLIC_URL)) return null;
-  const key = url.slice(R2_PUBLIC_URL.length);
+  // Try current CDN domain first, then R2's default public host
+  const parts =
+    url.startsWith(R2_PUBLIC_URL)
+      ? [R2_PUBLIC_URL]
+      : url.match(/^https:\/\/[a-zA-Z0-9-]+\.r2\.dev/)?.[0]
+        ? [url.match(/^https:\/\/[a-zA-Z0-9-]+\.r2\.dev/)![0]]
+        : null;
+
+  if (!parts) return null;
+  const key = url.slice(parts[0].length);
   return key.startsWith("/") ? key.slice(1) : key;
 }
