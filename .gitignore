@@ -11,6 +11,7 @@
 # next.js
 /.next/
 /out/
+/next-env.d.ts
 
 # production
 /build
@@ -19,6 +20,8 @@
 # misc
 .DS_Store
 *.pem
+tsconfig.tsbuildinfo
+/prisma/dev.db
 
 # debug
 npm-debug.log*
