@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Pencil, Trash2, X, Check, Loader2 } from "lucide-react";
+import { Pencil, Trash2, X, Check, Loader2, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Photo } from "@prisma/client";
 
@@ -61,6 +61,34 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
 
   const [deleteTarget, setDeleteTarget] = useState<Photo | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [rotating, setRotating] = useState(false);
+
+  // ── Rotate logic ─────────────────────────────────
+
+  const handleRotate = useCallback(
+    async (photo: Photo, angle: number) => {
+      if (rotating) return;
+      setRotating(true);
+      try {
+        const res = await fetch("/api/photos/rotate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: photo.id, angle }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const updated = (await res.json()) as Photo;
+        onPhotosChange(
+          photos.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)),
+        );
+        toast.success("已旋转");
+      } catch {
+        toast.error("旋转失败");
+      } finally {
+        setRotating(false);
+      }
+    },
+    [rotating, photos, onPhotosChange],
+  );
 
   // ── Edit logic ──────────────────────────────────
 
@@ -257,6 +285,25 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
                         {photo.title}
                       </h3>
                       <div className="flex shrink-0 gap-0.5 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100">
+                        {/* Rotate buttons */}
+                        <button
+                          type="button"
+                          onClick={() => handleRotate(photo, -90)}
+                          disabled={rotating}
+                          className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors disabled:opacity-30"
+                          title="向左旋转 90°"
+                        >
+                          <RotateCw className="h-3.5 w-3.5 rotate-[270deg]" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRotate(photo, 90)}
+                          disabled={rotating}
+                          className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors disabled:opacity-30"
+                          title="向右旋转 90°"
+                        >
+                          <RotateCw className="h-3.5 w-3.5" />
+                        </button>
                         {/* Edit button */}
                         <button
                           type="button"
