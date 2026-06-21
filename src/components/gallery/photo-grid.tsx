@@ -37,6 +37,13 @@ export function PhotoGrid({
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
 
+  // Update URL bar when lightbox opens (no page navigation)
+  useEffect(() => {
+    if (open && photos[index]?.slug) {
+      window.history.replaceState(null, "", `/photo/${photos[index].slug}`);
+    }
+  }, [open, index, photos]);
+
   const { mode } = useViewMode();
 
   const hasMore = cursor !== null;
@@ -144,7 +151,10 @@ export function PhotoGrid({
         photos={photos}
         open={open}
         index={index}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false);
+          window.history.replaceState(null, "", "/");
+        }}
         onIndexChange={setIndex}
       />
     </>

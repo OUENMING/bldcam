@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Photo } from "@prisma/client";
@@ -45,15 +44,6 @@ export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) 
   const [inView, setInView] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const exifLine = formatExifLine(photo);
-  const router = useRouter();
-
-  function handleClick() {
-    if (photo.slug) {
-      router.push(`/photo/${photo.slug}`);
-    } else {
-      onClick?.();
-    }
-  }
 
   // ── Intersection Observer: scroll-triggered entry animation ──
   useEffect(() => {
@@ -91,7 +81,7 @@ export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) 
           "bg-muted shadow-md transition-shadow duration-500 ease-out",
           "hover:shadow-xl md:shadow-lg md:hover:shadow-2xl",
         )}
-        onClick={handleClick}
+        onClick={onClick}
       >
         {/* ── Image ──────────────────────────────── */}
         <Image
