@@ -53,6 +53,9 @@ model Photo {
   category    String?
   tags        String?
 
+  // SEO: unique URL slug for photo detail page
+  slug        String?  @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

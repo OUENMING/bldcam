@@ -3,6 +3,7 @@ import { isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { deleteFromR2, extractKeyFromUrl } from "@/lib/r2";
 import { pipeline } from "@/lib/image/pipeline";
+import { generateSlug } from "@/lib/slug";
 
 // ── Auth helper ──────────────────────────────────────
 async function guard() {
@@ -101,6 +102,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         category,
+        slug: generateSlug(title),
 
         // EXIF
         make: exif?.make ?? null,

@@ -1,0 +1,145 @@
+import Image from "next/image";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { prisma } from "@/lib/prisma";
+import { formatDate, formatExposureTime } from "@/lib/format";
+
+interface Props {
+  params: Promise<{ slug: string }>;
+}
+
+// ── generateMetadata (SEO) ─────────────────────
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const photo = await prisma.photo.findUnique({ where: { slug } });
+
+  if (!photo) {
+    return { title: "未找到照片 · BLDcam" };
+  }
+
+  const description = [
+    photo.title,
+    photo.city && `摄于 ${photo.city}`,
+    photo.make && photo.model && `${photo.make} ${photo.model}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return {
+    title: `${photo.title} · BLDcam`,
+    description,
+    openGraph: {
+      title: photo.title,
+      description,
+      images: [photo.thumbnailUrl || photo.url],
+      type: "article",
+    },
+  };
+}
+
+// ── Page ─────────────────────────────────────
+
+export default async function PhotoDetailPage({ params }: Props) {
+  const { slug } = await params;
+  const photo = await prisma.photo.findUnique({ where: { slug } });
+
+  if (!photo) notFound();
+
+  const location = [photo.city, photo.region, photo.country]
+    .filter(Boolean)
+    .join(" · ");
+
+  const camera = [photo.make, photo.model].filter(Boolean).join(" ");
+  const exif = [
+    photo.focalLength35mm && `${photo.focalLength35mm}mm`,
+    photo.fNumber && `f/${photo.fNumber}`,
+    photo.iso && `ISO ${photo.iso}`,
+    photo.exposureTime && formatExposureTime(photo.exposureTime),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="mx-auto min-h-screen max-w-5xl px-4 py-16 sm:px-6 md:py-24">
+      {/* ── Back link ─────────────────────── */}
+      <Link
+        href="/"
+        className="mb-8 inline-flex items-center gap-1.5 text-zinc-500 text-sm hover:text-zinc-300 transition-colors"
+      >
+        ← 返回画廊
+      </Link>
+
+      {/* ── Image ────────────────────────── */}
+      <div className="relative w-full overflow-hidden rounded-2xl bg-neutral-950 md:rounded-3xl">
+        <Image
+          src={photo.url}
+          alt={photo.title}
+          width={photo.width}
+          height={photo.height}
+          priority
+          blurDataURL={photo.blurDataUrl ?? undefined}
+          placeholder="blur"
+          className="h-auto w-full"
+          sizes="(max-width: 768px) 100vw, 80vw"
+        />
+      </div>
+
+      {/* ── Info ─────────────────────────── */}
+      <div className="mt-8 space-y-4">
+        <h1 className="font-semibold text-white text-2xl tracking-tight sm:text-3xl">
+          {photo.title}
+        </h1>
+
+        {photo.description && (
+          <p className="text-zinc-400 text-base">{photo.description}</p>
+        )}
+
+        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          {camera && (
+            <span className="text-zinc-500">
+              <span className="text-zinc-600">相机 </span>
+              <span className="text-zinc-300">{camera}</span>
+            </span>
+          )}
+          {photo.lensModel && (
+            <span className="text-zinc-500">
+              <span className="text-zinc-600">镜头 </span>
+              <span className="text-zinc-300">{photo.lensModel}</span>
+            </span>
+          )}
+          {exif && (
+            <span className="text-zinc-500">
+              <span className="text-zinc-600">参数 </span>
+              <span className="text-zinc-300">{exif}</span>
+            </span>
+          )}
+          {photo.dateTimeOriginal && (
+            <span className="text-zinc-500">
+              <span className="text-zinc-600">拍摄 </span>
+              <span className="text-zinc-300">
+                {formatDate(new Date(photo.dateTimeOriginal))}
+              </span>
+            </span>
+          )}
+        </div>
+
+        {location && (
+          <p className="text-zinc-500 text-sm">
+            📍 <span className="text-zinc-400">{location}</span>
+          </p>
+        )}
+
+        {photo.category && (
+          <Link
+            href={`/?category=${encodeURIComponent(photo.category)}`}
+            className="inline-block rounded-full bg-zinc-900 px-3 py-1 text-xs text-zinc-400 hover:bg-zinc-800 transition-colors"
+          >
+            {photo.category}
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}

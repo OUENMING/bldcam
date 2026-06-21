@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Photo } from "@prisma/client";
@@ -128,7 +129,17 @@ export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) 
               "transition-all duration-500 ease-out",
             )}
           >
-            {photo.title}
+            {photo.slug ? (
+              <Link
+                href={`/photo/${photo.slug}`}
+                className="hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {photo.title}
+              </Link>
+            ) : (
+              photo.title
+            )}
           </h3>
           {exifLine && (
             <p
