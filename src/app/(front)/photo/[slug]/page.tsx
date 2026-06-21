@@ -71,6 +71,38 @@ export default async function PhotoDetailPage({ params }: Props) {
         ← 返回画廊
       </Link>
 
+      {/* ── JSON-LD structured data ─────── */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Photograph",
+            name: photo.title,
+            description: photo.description || photo.title,
+            image: photo.url,
+            thumbnailUrl: photo.thumbnailUrl,
+            locationCreated: location
+              ? { "@type": "Place", name: location }
+              : undefined,
+            exifData: [
+              { "@type": "PropertyValue", name: "相机", value: camera },
+              { "@type": "PropertyValue", name: "参数", value: exif },
+              photo.dateTimeOriginal && {
+                "@type": "PropertyValue",
+                name: "拍摄日期",
+                value: new Date(photo.dateTimeOriginal)
+                  .toISOString()
+                  .split("T")[0],
+              },
+            ].filter(Boolean),
+            dateCreated: photo.dateTimeOriginal?.toISOString(),
+            author: { "@type": "Person", name: "菠萝丁 (Owen)" },
+            url: `https://bldcam.page/photo/${photo.slug}`,
+          }),
+        }}
+      />
+
       {/* ── Image ────────────────────────── */}
       <div className="relative w-full overflow-hidden rounded-2xl bg-neutral-950 md:rounded-3xl">
         <Image
