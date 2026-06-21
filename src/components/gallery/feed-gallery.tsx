@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useImageDisplaySize } from "@/hooks/use-image-display-size";
@@ -61,6 +62,15 @@ function FeedCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const exifLine = formatExifLine(photo);
   const locationLine = formatLocation(photo);
+  const router = useRouter();
+
+  function handleClick() {
+    if (photo.slug) {
+      router.push(`/photo/${photo.slug}`);
+    } else {
+      onClick?.();
+    }
+  }
 
   const displaySize = useImageDisplaySize(photo.width, photo.height);
 
@@ -101,7 +111,7 @@ function FeedCard({
           height: displaySize.height,
           maxWidth: "100%",
         }}
-        onClick={onClick}
+        onClick={handleClick}
       >
         <Image
           fill
