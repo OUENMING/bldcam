@@ -99,6 +99,10 @@ bash deploy.sh
 
 详见 [docs/项目总结.md](docs/项目总结.md) — 完整时间线、13 个难点、经验教训。
 
+## 致谢
+
+本项目 UI 灵感和部分交互方案参考了 [sun0225SUN/camlife](https://github.com/sun0225SUN/camlife)，一个出色的摄影作品集项目。架构自行从零搭建，感谢开源社区。
+
 ---
 
 完
