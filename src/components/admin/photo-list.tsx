@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Pencil, Trash2, X, Check, Loader2, RotateCw } from "lucide-react";
+import { Pencil, Trash2, X, Check, Loader2, RotateCw, Images } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatExifLine, formatLocation } from "@/lib/format";
 import type { Photo } from "@prisma/client";
@@ -162,14 +162,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="mb-3 rounded-full bg-card p-4">
-          <Image
-            src="/placeholder.svg"  // won't render, just a fallback
-            alt=""
-            width={32}
-            height={32}
-            className="opacity-30"
-            unoptimized
-          />
+          <Images className="size-8 opacity-30" />
         </div>
         <p className="text-muted-foreground text-sm">还没有上传照片</p>
         <p className="mt-1 text-muted-foreground/70 text-xs">
