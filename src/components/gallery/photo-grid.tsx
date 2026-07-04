@@ -2,12 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useInView } from "react-intersection-observer";
+import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import type { Photo } from "@prisma/client";
 import { useViewMode } from "@/context/view-mode";
 import { MemoizedPhotoCard } from "./photo-card";
 import { FeedGallery } from "./feed-gallery";
-import { PhotoLightbox } from "./photo-lightbox";
+
+const PhotoLightbox = dynamic(
+  () => import("./photo-lightbox").then((m) => ({ default: m.PhotoLightbox })),
+  { ssr: false },
+);
 
 const PAGE_SIZE = 20;
 

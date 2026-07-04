@@ -95,7 +95,7 @@ export default async function PhotoDetailPage({ params }: Props) {
       />
 
       {/* ── Image ────────────────────────── */}
-      <div className="relative w-full overflow-hidden rounded-3xl bg-[#1a1a1a] dark:bg-black md:rounded-[2rem]">
+      <div className="relative w-full overflow-hidden rounded-3xl bg-background dark:bg-black md:rounded-[2rem]">
         <Image
           src={photo.url}
           alt={photo.title}
