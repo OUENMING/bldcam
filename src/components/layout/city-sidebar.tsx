@@ -17,19 +17,24 @@ interface CityInfo {
   count: number;
 }
 
+interface CountryGroup {
+  country: string;
+  cities: CityInfo[];
+}
+
 interface CategoryInfo {
   category: string;
   count: number;
 }
 
 interface CitySidebarProps {
-  cities: CityInfo[];
+  countryGroups: CountryGroup[];
   categories: CategoryInfo[];
   totalCount: number;
 }
 
 export function CitySidebar({
-  cities,
+  countryGroups,
   categories,
   totalCount,
 }: CitySidebarProps) {
@@ -41,6 +46,7 @@ export function CitySidebar({
   const [collapsed, setCollapsed] = useState(true); // sidebar hidden by default
   const [cityOpen, setCityOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [openCountries, setOpenCountries] = useState<Set<string>>(new Set());
 
   // ── Auto-collapse on navigation (mobile only) ──
   useEffect(() => {
@@ -131,7 +137,7 @@ export function CitySidebar({
                 城市
               </span>
               <span className="text-muted-foreground/60 text-[10px] tabular-nums">
-                ({cities.length})
+                ({countryGroups.length})
               </span>
               <ChevronDown
                 className={cn(
@@ -150,28 +156,68 @@ export function CitySidebar({
               )}
             >
               <div className="overflow-hidden">
-                {cities.length > 0 ? (
-                  <ul className="space-y-0.5 pt-1">
-                    {cities.map(({ city, count }) => (
-                      <li key={city}>
-                        <Link
-                          href={cityHref(city)}
-                          className={cn(
-                            "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
-                            activeCity === city
-                              ? "bg-muted font-medium text-foreground"
-                              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                          )}
-                        >
-                          <MapPin className="h-3.5 w-3.5 shrink-0 opacity-50" />
-                          <span className="flex-1 truncate">{city}</span>
-                          <span className="text-muted-foreground text-xs tabular-nums">
-                            {count}
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                {countryGroups.length > 0 ? (
+                  <div className="space-y-1 pt-1">
+                    {countryGroups.map(({ country, cities }) => {
+                      const isOpen = openCountries.has(country);
+                      return (
+                        <div key={country}>
+                          {/* ── Country toggle ────── */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenCountries((prev) => {
+                                const next = new Set(prev);
+                                next.has(country) ? next.delete(country) : next.add(country);
+                                return next;
+                              })
+                            }
+                            className="flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted-foreground text-xs hover:text-foreground transition-colors"
+                          >
+                            <ChevronDown
+                              className={cn(
+                                "h-3 w-3 shrink-0 transition-transform duration-200",
+                                isOpen && "rotate-180",
+                              )}
+                            />
+                            <span>{country}</span>
+                          </button>
+
+                          {/* ── Cities ────────────── */}
+                          <div
+                            className={cn(
+                              "grid transition-all duration-200 ease-out",
+                              isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                            )}
+                          >
+                            <div className="overflow-hidden">
+                              <ul className="space-y-0.5 pl-6 pt-0.5">
+                                {cities.map(({ city, count }) => (
+                                  <li key={city}>
+                                    <Link
+                                      href={cityHref(city)}
+                                      className={cn(
+                                        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+                                        activeCity === city
+                                          ? "bg-muted font-medium text-foreground"
+                                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                                      )}
+                                    >
+                                      <MapPin className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                                      <span className="flex-1 truncate">{city}</span>
+                                      <span className="text-muted-foreground text-xs tabular-nums">
+                                        {count}
+                                      </span>
+                                    </Link>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <p className="px-3 pt-1 text-muted-foreground/60 text-xs">
                     上传带 GPS 坐标的照片后自动显示

@@ -17,13 +17,13 @@ export default async function HomePage({ searchParams }: PageProps) {
   // ── Total count (all photos, regardless of filters) ──
   const totalCount = await prisma.photo.count();
 
-  // ── Query cities + categories (grouped with counts) ──
+  // ── Query cities grouped by country + categories ──
   const [cityRows, categoryRows] = await Promise.all([
     prisma.photo.groupBy({
-      by: ["city"],
+      by: ["country", "city"],
       where: { city: { not: null } },
       _count: { id: true },
-      orderBy: { _count: { id: "desc" } },
+      orderBy: [{ country: "asc" }, { _count: { id: "desc" } }],
     }),
     prisma.photo.groupBy({
       by: ["category"],
@@ -33,9 +33,18 @@ export default async function HomePage({ searchParams }: PageProps) {
     }),
   ]);
 
-  const cities = cityRows
-    .filter((r) => r.city)
-    .map((r) => ({ city: r.city!, count: r._count.id }));
+  // Group cities by country
+  const countryMap = new Map<string, { city: string; count: number }[]>();
+  cityRows.forEach((r) => {
+    if (!r.country || !r.city) return;
+    const list = countryMap.get(r.country) ?? [];
+    list.push({ city: r.city, count: r._count.id });
+    countryMap.set(r.country, list);
+  });
+  const countryGroups = Array.from(countryMap, ([country, cities]) => ({
+    country,
+    cities,
+  }));
 
   const categories = categoryRows
     .filter((r) => r.category)
@@ -74,7 +83,7 @@ export default async function HomePage({ searchParams }: PageProps) {
         }
       >
         <CitySidebar
-          cities={cities}
+          countryGroups={countryGroups}
           categories={categories}
           totalCount={totalCount}
         />
