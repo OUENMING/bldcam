@@ -164,7 +164,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     const data: Record<string, string> = {};
-    if (title !== undefined) data.title = title.trim();
+    if (title !== undefined) {
+      data.title = title.trim();
+      data.slug = generateSlug(title.trim());
+    }
     if (description !== undefined) data.description = description.trim();
 
     if (Object.keys(data).length === 0) {

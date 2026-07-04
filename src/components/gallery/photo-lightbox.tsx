@@ -6,7 +6,7 @@ import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
 import { cn } from "@/lib/utils";
-import { formatDate, formatExposureTime, formatGps } from "@/lib/format";
+import { formatDate, formatExposureTime, formatGps, formatAperture, formatLocation } from "@/lib/format";
 import type { Photo } from "@prisma/client";
 
 // ── Slide type — extend YARL's slide with our EXIF data ──
@@ -49,7 +49,7 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
   if (slide.lensModel)
     exifItems.push({ label: "镜头", value: slide.lensModel });
   if (slide.fNumber)
-    exifItems.push({ label: "光圈", value: `f/${slide.fNumber}` });
+    exifItems.push({ label: "光圈", value: formatAperture(slide.fNumber) });
   if (slide.exposureTime)
     exifItems.push({
       label: "快门",
@@ -70,9 +70,7 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
       ? formatGps(slide.latitude, slide.longitude)
       : null;
 
-  const location = [slide.city, slide.region, slide.country]
-    .filter(Boolean)
-    .join(" · ");
+  const location = formatLocation(slide);
 
   return (
     <div className="relative flex h-full w-full items-center justify-center">
@@ -93,12 +91,15 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
       />
 
       {/* ── EXIF overlay ──────────────────────── */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/80 px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-10 text-center md:px-6">
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/80 px-4 pt-10 text-center md:px-6"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         <h2 className="mb-0.5 font-semibold text-white text-sm drop-shadow-md">
           {slide.title}
         </h2>
         {slide.description && (
-          <p className="mb-1 text-gray-400 text-xs drop-shadow-md">
+          <p className="mb-1 text-white/50 text-xs drop-shadow-md">
             {slide.description}
           </p>
         )}
@@ -109,14 +110,14 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
                 key={item.label}
                 className="inline-flex items-baseline gap-1 text-xs"
               >
-                <span className="text-gray-500">{item.label}</span>
-                <span className="text-gray-200">{item.value}</span>
+                <span className="text-white/40">{item.label}</span>
+                <span className="text-white/80">{item.value}</span>
               </span>
             ))}
           </div>
         )}
         {(location || gps) && (
-          <p className="mt-0.5 text-gray-500 text-xs">
+          <p className="mt-0.5 text-white/40 text-xs">
             {location || gps}
           </p>
         )}

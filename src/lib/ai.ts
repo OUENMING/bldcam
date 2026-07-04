@@ -1,6 +1,8 @@
 // ── Volcengine Ark (豆包) Vision API ─────────────────
 //
 // Docs: https://www.volcengine.com/docs/82379/1362931
+
+const DEBUG = process.env.NODE_ENV !== "production";
 //
 // Uses the Responses API (/v3/responses), NOT Chat Completions.
 // Auth: standard Bearer token (unlike MiMo's custom api-key).
@@ -182,7 +184,7 @@ export async function suggestMetadata(
     // and the actual message as output[1] (or later).
     // Find the first "message" type item, NOT just output[0].
     const outputTypes = data.output?.map((o: unknown) => (o as { type?: string }).type) ?? [];
-    console.log("Doubao output types:", outputTypes);
+    if (DEBUG) console.log("Doubao output types:", outputTypes);
 
     const messageItem = data.output?.find(
       (o: unknown) => (o as { type?: string }).type === "message",
@@ -200,14 +202,14 @@ export async function suggestMetadata(
       return { suggestedTitle: null, suggestedCategory: null };
     }
 
-    console.log("━━━ Doubao raw ━━━");
-    console.log(content.slice(0, 500));
-    console.log("━━━━━━━━━━━━━━━━━━━");
+    if (DEBUG) console.log("━━━ Doubao raw ━━━");
+    if (DEBUG) console.log(content.slice(0, 500));
+    if (DEBUG) console.log("━━━━━━━━━━━━━━━━━━━");
 
     // 1) JSON
     const parsed = extractJson(content);
     if (parsed) {
-      console.log("Doubao JSON parsed OK");
+      if (DEBUG) console.log("Doubao JSON parsed OK");
       const title =
         typeof parsed.title === "string" && parsed.title.trim().length > 0
           ? parsed.title.trim().slice(0, 20)
@@ -221,10 +223,10 @@ export async function suggestMetadata(
     }
 
     // 2) Regex fallback
-    console.log("Doubao JSON parse failed, trying regex...");
+    if (DEBUG) console.log("Doubao JSON parse failed, trying regex...");
     const regexResult = extractByRegex(content);
     if (regexResult.suggestedTitle || regexResult.suggestedCategory) {
-      console.log("Doubao regex extracted:", regexResult);
+      if (DEBUG) console.log("Doubao regex extracted:", regexResult);
       return regexResult;
     }
 

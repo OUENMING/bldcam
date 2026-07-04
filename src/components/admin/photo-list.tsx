@@ -15,29 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import { Pencil, Trash2, X, Check, Loader2, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatExifLine, formatLocation } from "@/lib/format";
 import type { Photo } from "@prisma/client";
 
 // ── Helpers ─────────────────────────────────────────
-
-function exifSummary(photo: Photo): string {
-  const parts: string[] = [];
-  if (photo.focalLength35mm) parts.push(`${photo.focalLength35mm}mm`);
-  else if (photo.focalLength) parts.push(`${photo.focalLength}mm`);
-  if (photo.fNumber) parts.push(`f/${photo.fNumber}`);
-  if (photo.iso) parts.push(`ISO ${photo.iso}`);
-  if (photo.exposureTime) {
-    parts.push(
-      photo.exposureTime < 1
-        ? `1/${Math.round(1 / photo.exposureTime)}s`
-        : `${photo.exposureTime}s`,
-    );
-  }
-  return parts.join(" · ");
-}
-
-function formatLocation(photo: Photo): string {
-  return [photo.city, photo.region, photo.country].filter(Boolean).join(" · ");
-}
 
 function formatSize(bytes: number | null): string {
   if (!bytes) return "";
@@ -180,7 +161,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
   if (photos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="mb-3 rounded-full bg-zinc-900 p-4">
+        <div className="mb-3 rounded-full bg-card p-4">
           <Image
             src="/placeholder.svg"  // won't render, just a fallback
             alt=""
@@ -190,8 +171,8 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
             unoptimized
           />
         </div>
-        <p className="text-zinc-500 text-sm">还没有上传照片</p>
-        <p className="mt-1 text-zinc-600 text-xs">
+        <p className="text-muted-foreground text-sm">还没有上传照片</p>
+        <p className="mt-1 text-muted-foreground/70 text-xs">
           在上方拖拽或选择照片开始上传
         </p>
       </div>
@@ -204,7 +185,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {photos.map((photo) => {
           const isEditing = editingId === photo.id;
-          const summary = exifSummary(photo);
+          const summary = formatExifLine(photo);
           const location = formatLocation(photo);
           const size = formatSize(photo.fileSize);
 
@@ -212,8 +193,8 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
             <div
               key={photo.id}
               className={cn(
-                "group overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/50 transition-colors",
-                isEditing && "border-amber-500/30 bg-zinc-900",
+                "group overflow-hidden rounded-xl border border-border bg-card/50 transition-colors",
+                isEditing && "border-amber-500/30 bg-card",
               )}
             >
               {/* Thumbnail */}
@@ -281,7 +262,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
                   /* ── Display mode ───────────── */
                   <>
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-medium text-sm text-zinc-200 leading-snug line-clamp-1">
+                      <h3 className="font-medium text-sm text-foreground/80 leading-snug line-clamp-1">
                         {photo.title}
                       </h3>
                       <div className="flex shrink-0 gap-0.5 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100">
@@ -290,7 +271,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
                           type="button"
                           onClick={() => handleRotate(photo, -90)}
                           disabled={rotating}
-                          className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors disabled:opacity-30"
+                          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground/80 transition-colors disabled:opacity-30"
                           title="向左旋转 90°"
                         >
                           <RotateCw className="h-3.5 w-3.5 rotate-[270deg]" />
@@ -299,7 +280,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
                           type="button"
                           onClick={() => handleRotate(photo, 90)}
                           disabled={rotating}
-                          className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors disabled:opacity-30"
+                          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground/80 transition-colors disabled:opacity-30"
                           title="向右旋转 90°"
                         >
                           <RotateCw className="h-3.5 w-3.5" />
@@ -308,7 +289,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
                         <button
                           type="button"
                           onClick={() => startEditing(photo)}
-                          className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+                          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground/80 transition-colors"
                           title="编辑"
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -317,7 +298,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
                         <button
                           type="button"
                           onClick={() => setDeleteTarget(photo)}
-                          className="rounded p-1 text-zinc-500 hover:bg-red-900/30 hover:text-red-400 transition-colors"
+                          className="rounded p-1 text-muted-foreground hover:bg-red-900/30 hover:text-red-400 transition-colors"
                           title="删除"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -326,18 +307,18 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
                     </div>
 
                     {photo.description && (
-                      <p className="text-zinc-500 text-xs line-clamp-1">
+                      <p className="text-muted-foreground text-xs line-clamp-1">
                         {photo.description}
                       </p>
                     )}
 
-                    <div className="flex items-center gap-2 text-zinc-600 text-xs">
+                    <div className="flex items-center gap-2 text-muted-foreground/70 text-xs">
                       {summary && <span>{summary}</span>}
                       {size && <span>{size}</span>}
                     </div>
 
                     {location && (
-                      <p className="text-zinc-600 text-xs">{location}</p>
+                      <p className="text-muted-foreground/70 text-xs">{location}</p>
                     )}
                   </>
                 )}
@@ -359,7 +340,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
               此操作将永久删除「
-              <span className="font-medium text-zinc-200">
+              <span className="font-medium text-foreground/80">
                 {deleteTarget?.title}
               </span>
               」，包括 Cloudflare R2 中的原始图片和缩略图。

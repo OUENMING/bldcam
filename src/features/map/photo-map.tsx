@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Map, { Marker, Popup } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { formatAperture, formatLocation } from "@/lib/format";
 import type { Photo } from "@prisma/client";
 
 // ── Types ────────────────────────────────────────
@@ -33,9 +34,7 @@ function PhotoPopup({
 }) {
   const router = useRouter();
 
-  const location = [photo.city, photo.region, photo.country]
-    .filter(Boolean)
-    .join(" · ");
+  const location = formatLocation(photo);
 
   const coords = photo.latitude && photo.longitude
     ? `${photo.latitude.toFixed(4)}°, ${photo.longitude.toFixed(4)}°`
@@ -43,7 +42,7 @@ function PhotoPopup({
 
   const exif = [
     photo.focalLength35mm && `${photo.focalLength35mm}mm`,
-    photo.fNumber && `f/${photo.fNumber}`,
+    photo.fNumber && formatAperture(photo.fNumber),
     photo.iso && `ISO ${photo.iso}`,
   ]
     .filter(Boolean)
@@ -52,10 +51,10 @@ function PhotoPopup({
   const hasCity = !!photo.city;
 
   return (
-    <div className="w-64 rounded-xl border border-amber-600/30 bg-[#09090b] p-3 shadow-[0_0_25px_-5px_rgba(217,119,6,0.15)]">
+    <div className="w-64 rounded-xl border border-amber-600/30 bg-background p-3 shadow-[0_0_25px_-5px_rgba(217,119,6,0.15)]">
       {/* Thumbnail */}
       {photo.thumbnailUrl && (
-        <div className="relative mb-2 aspect-video w-full overflow-hidden rounded-md bg-neutral-800">
+        <div className="relative mb-2 aspect-video w-full overflow-hidden rounded-md bg-muted">
           <Image
             src={photo.thumbnailUrl}
             alt={photo.title}
@@ -67,18 +66,18 @@ function PhotoPopup({
       )}
 
       {/* Title */}
-      <h3 className="font-semibold text-white text-sm">{photo.title}</h3>
+      <h3 className="font-semibold text-foreground text-sm">{photo.title}</h3>
 
       {/* Location or coords */}
       {location && (
-        <p className="mt-0.5 truncate text-gray-400 text-xs">{location}</p>
+        <p className="mt-0.5 truncate text-muted-foreground text-xs">{location}</p>
       )}
       {!location && coords && (
-        <p className="mt-0.5 truncate text-gray-500 text-xs">{coords}</p>
+        <p className="mt-0.5 truncate text-muted-foreground text-xs">{coords}</p>
       )}
 
       {/* EXIF */}
-      {exif && <p className="mt-1 text-gray-500 text-xs">{exif}</p>}
+      {exif && <p className="mt-1 text-muted-foreground text-xs">{exif}</p>}
 
       {/* Action: go to city page */}
       {hasCity && (
@@ -126,7 +125,10 @@ export function PhotoMap({ photos }: PhotoMapProps) {
   }, []);
 
   return (
-    <div className="relative h-[calc(100svh-4rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] w-full">
+    <div
+      className="relative w-full"
+      style={{ height: "calc(100svh - 4rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))" }}
+    >
       <Map
         initialViewState={{
           longitude: 104,

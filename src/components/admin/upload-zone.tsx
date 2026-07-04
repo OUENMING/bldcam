@@ -320,15 +320,15 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
           "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 transition-colors duration-200",
           dragOver
             ? "border-amber-500/50 bg-amber-500/5"
-            : "border-zinc-800 hover:border-zinc-600",
+            : "border-border hover:border-muted-foreground",
         )}
         onClick={() => fileInputRef.current?.click()}
       >
-        <Upload className="mb-3 h-8 w-8 text-zinc-500" />
-        <p className="text-zinc-400 text-sm">
+        <Upload className="mb-3 h-8 w-8 text-muted-foreground" />
+        <p className="text-foreground/60 text-sm">
           拖拽多张照片至此，或点击浏览
         </p>
-        <p className="mt-1 text-zinc-500 text-xs">
+        <p className="mt-1 text-muted-foreground text-xs">
           支持 JPG / PNG / WebP / TIFF · AI 自动起名
         </p>
         <input
@@ -345,14 +345,14 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
       {queue.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="font-medium text-zinc-300 text-sm">
+            <p className="font-medium text-foreground/70 text-sm">
               上传队列 ({queue.length})
             </p>
             {!batchUploading && (
               <button
                 type="button"
                 onClick={() => setQueue([])}
-                className="text-zinc-500 text-xs hover:text-zinc-300 transition-colors"
+                className="text-muted-foreground text-xs hover:text-foreground/70 transition-colors"
               >
                 清空
               </button>
@@ -369,7 +369,7 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
                     ? "border-emerald-500/20 bg-emerald-500/5"
                     : entry.status === "error"
                       ? "border-red-500/20 bg-red-500/5"
-                      : "border-zinc-800 bg-zinc-900/50",
+                      : "border-border bg-card/50",
                 )}
               >
                 {/* Status icon */}
@@ -387,7 +387,7 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
                     <Sparkles className="h-4 w-4 animate-pulse text-purple-400" />
                   )}
                   {entry.status === "pending" && !entry.aiLoading && (
-                    <div className="h-4 w-4 rounded-full border-2 border-zinc-600" />
+                    <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/70" />
                   )}
                 </div>
 
@@ -400,21 +400,21 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
                       disabled={batchUploading || entry.status === "done"}
                       placeholder="标题"
                       className={cn(
-                        "h-6 flex-1 min-w-0 border-0 bg-transparent px-0 font-medium text-sm placeholder:text-zinc-600 focus-visible:ring-0",
+                        "h-6 flex-1 min-w-0 border-0 bg-transparent px-0 font-medium text-sm placeholder:text-muted-foreground/70 focus-visible:ring-0",
                         entry.aiSuggested &&
                           entry.status === "pending" &&
                           "text-purple-300",
-                        entry.status !== "pending" && "text-zinc-200",
+                        entry.status !== "pending" && "text-foreground/80",
                       )}
                     />
                     {entry.aiSuggested && entry.status === "pending" && (
                       <Sparkles className="h-3.5 w-3.5 shrink-0 text-purple-400" />
                     )}
-                    <span className="shrink-0 text-zinc-600 text-xs">
+                    <span className="shrink-0 text-muted-foreground/70 text-xs">
                       {formatSize(entry.file.size)}
                     </span>
                   </div>
-                  <p className="truncate text-zinc-500 text-xs">
+                  <p className="truncate text-muted-foreground text-xs">
                     {entry.file.name}
                     {entry.aiLoading && (
                       <span className="ml-1.5 inline-flex items-center text-purple-400">
@@ -425,7 +425,7 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
                     {entry.category &&
                       entry.status === "pending" &&
                       !entry.aiLoading && (
-                        <span className="ml-1.5 text-zinc-600">
+                        <span className="ml-1.5 text-muted-foreground/70">
                           · {entry.category}
                         </span>
                       )}
@@ -446,7 +446,7 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
                   <button
                     type="button"
                     onClick={() => removeEntry(entry.id)}
-                    className="shrink-0 rounded p-0.5 text-zinc-600 hover:text-zinc-300 transition-colors"
+                    className="shrink-0 rounded p-0.5 text-muted-foreground/70 hover:text-foreground/70 transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>

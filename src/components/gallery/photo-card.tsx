@@ -2,34 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { formatExifLine } from "@/lib/format";
 import type { Photo } from "@prisma/client";
-
-// ── EXIF summary line ──────────────────────────────
-
-function formatExifLine(photo: Photo): string {
-  const parts: string[] = [];
-
-  if (photo.focalLength35mm) {
-    parts.push(`${photo.focalLength35mm}mm`);
-  } else if (photo.focalLength) {
-    parts.push(`${photo.focalLength}mm`);
-  }
-
-  if (photo.fNumber) parts.push(`f/${photo.fNumber}`);
-  if (photo.iso) parts.push(`ISO ${photo.iso}`);
-
-  if (photo.exposureTime) {
-    if (photo.exposureTime < 1) {
-      parts.push(`1/${Math.round(1 / photo.exposureTime)}s`);
-    } else {
-      parts.push(`${photo.exposureTime}s`);
-    }
-  }
-
-  return parts.join(" · ");
-}
 
 // ── Component ──────────────────────────────────────
 
@@ -39,7 +15,7 @@ interface PhotoCardProps {
   onClick?: () => void;
 }
 
-export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) {
+function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [inView, setInView] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -57,7 +33,7 @@ export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) 
           observer.disconnect();
         }
       },
-      { threshold: 0.1, rootMargin: "50px" },
+      { threshold: 0.05, rootMargin: "200px" },
     );
 
     observer.observe(el);
@@ -69,15 +45,15 @@ export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) 
       ref={cardRef}
       className={cn(
         "mb-2 break-inside-avoid select-none sm:mb-3 md:mb-4",
-        inView
+        inView && isLoaded
           ? "translate-y-0 opacity-100"
           : "translate-y-4 opacity-0",
-        "transition-all duration-700 ease-out",
+        "transition-[opacity,transform] duration-700 ease-out",
       )}
     >
       <div
         className={cn(
-          "group relative cursor-pointer overflow-hidden rounded-xl",
+          "group relative cursor-pointer overflow-hidden rounded-2xl",
           "bg-muted shadow-md transition-shadow duration-500 ease-out",
           "hover:shadow-xl md:shadow-lg md:hover:shadow-2xl",
         )}
@@ -96,7 +72,7 @@ export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) 
           onLoad={() => setIsLoaded(true)}
           className={cn(
             "h-auto w-full",
-            "transition-all duration-700 ease-out",
+            "transition-transform duration-700 ease-out",
             "group-hover:scale-[1.03]",
             isLoaded ? "" : "blur-md grayscale",
           )}
@@ -110,7 +86,7 @@ export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) 
               opens lightbox with full EXIF.          */}
         <div
           className={cn(
-            "absolute inset-0 rounded-xl",
+            "absolute inset-0 rounded-2xl",
             "bg-gradient-to-t from-black/70 via-black/20 to-transparent",
             "opacity-0 transition-opacity duration-500 ease-out",
             "group-hover:opacity-100",
@@ -126,7 +102,7 @@ export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) 
               "font-semibold text-white text-lg leading-tight drop-shadow-md",
               "translate-y-4 opacity-0",
               "group-hover:translate-y-0 group-hover:opacity-100",
-              "transition-all duration-500 ease-out",
+              "transition-[opacity,transform] duration-500 ease-out",
             )}
           >
             {photo.slug ? (
@@ -144,10 +120,10 @@ export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) 
           {exifLine && (
             <p
               className={cn(
-                "mt-0.5 text-gray-100 text-sm drop-shadow-md",
+                "mt-0.5 text-white/80 text-sm drop-shadow-md",
                 "translate-y-4 opacity-0",
                 "group-hover:translate-y-0 group-hover:opacity-100",
-                "transition-all delay-75 duration-500 ease-out",
+                "transition-[opacity,transform] delay-75 duration-500 ease-out",
               )}
             >
               {exifLine}
@@ -158,3 +134,7 @@ export function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) 
     </div>
   );
 }
+
+export const MemoizedPhotoCard = memo(PhotoCard, (prev, next) =>
+  prev.photo.id === next.photo.id && prev.priority === next.priority
+);

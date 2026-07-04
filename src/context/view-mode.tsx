@@ -4,7 +4,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useState,
   type ReactNode,
 } from "react";
@@ -26,20 +25,14 @@ const ViewModeContext = createContext<ViewModeContextValue | null>(null);
 
 const STORAGE_KEY = "bldcam-view-mode";
 
-function readStored(): ViewMode {
-  if (typeof window === "undefined") return "waterfall";
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "feed") return "feed";
-  return "waterfall";
-}
-
 export function ViewModeProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<ViewMode>("waterfall");
-
-  // Hydrate from localStorage on mount (avoid SSR mismatch)
-  useEffect(() => {
-    setMode(readStored());
-  }, []);
+  const [mode, setMode] = useState<ViewMode>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === "feed") return "feed";
+    }
+    return "waterfall";
+  });
 
   const toggle = useCallback(() => {
     setMode((prev) => {

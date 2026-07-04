@@ -75,19 +75,19 @@ export function CitySidebar({
         type="button"
         onClick={() => setCollapsed((v) => !v)}
         className={cn(
-          "fixed top-20 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground shadow-sm transition-all duration-300 hover:text-foreground",
+          "fixed top-18 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground shadow-sm transition-all duration-300 hover:text-foreground",
           // Mobile: toggle stays at left edge
           // Desktop: follows sidebar edge
           collapsed
-            ? "left-1"
-            : "left-1 md:left-[212px]",
+            ? "left-2"
+            : "left-2 md:left-[212px]",
         )}
         aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
       >
         {collapsed ? (
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-5 w-5" />
         ) : (
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-5 w-5" />
         )}
       </button>
 

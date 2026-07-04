@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import { formatDate, formatExposureTime } from "@/lib/format";
+import { formatDate, formatExifLine, formatLocation } from "@/lib/format";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -47,26 +47,17 @@ export default async function PhotoDetailPage({ params }: Props) {
 
   if (!photo) notFound();
 
-  const location = [photo.city, photo.region, photo.country]
-    .filter(Boolean)
-    .join(" · ");
+  const location = formatLocation(photo);
 
   const camera = [photo.make, photo.model].filter(Boolean).join(" ");
-  const exif = [
-    photo.focalLength35mm && `${photo.focalLength35mm}mm`,
-    photo.fNumber && `f/${photo.fNumber}`,
-    photo.iso && `ISO ${photo.iso}`,
-    photo.exposureTime && formatExposureTime(photo.exposureTime),
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const exif = formatExifLine(photo);
 
   return (
     <div className="mx-auto min-h-screen max-w-5xl px-4 py-16 sm:px-6 md:py-24">
       {/* ── Back link ─────────────────────── */}
       <Link
         href="/"
-        className="mb-8 inline-flex items-center gap-1.5 text-zinc-500 text-sm hover:text-zinc-300 transition-colors"
+        className="mb-8 inline-flex items-center gap-1.5 text-muted-foreground text-sm hover:text-foreground/70 transition-colors"
       >
         ← 返回画廊
       </Link>
@@ -104,7 +95,7 @@ export default async function PhotoDetailPage({ params }: Props) {
       />
 
       {/* ── Image ────────────────────────── */}
-      <div className="relative w-full overflow-hidden rounded-2xl bg-neutral-950 md:rounded-3xl">
+      <div className="relative w-full overflow-hidden rounded-3xl bg-[#1a1a1a] dark:bg-black md:rounded-[2rem]">
         <Image
           src={photo.url}
           alt={photo.title}
@@ -120,37 +111,37 @@ export default async function PhotoDetailPage({ params }: Props) {
 
       {/* ── Info ─────────────────────────── */}
       <div className="mt-8 space-y-4">
-        <h1 className="font-semibold text-white text-2xl tracking-tight sm:text-3xl">
+        <h1 className="font-semibold text-foreground text-2xl tracking-tight sm:text-3xl">
           {photo.title}
         </h1>
 
         {photo.description && (
-          <p className="text-zinc-400 text-base">{photo.description}</p>
+          <p className="text-foreground/60 text-base">{photo.description}</p>
         )}
 
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           {camera && (
-            <span className="text-zinc-500">
-              <span className="text-zinc-600">相机 </span>
-              <span className="text-zinc-300">{camera}</span>
+            <span className="text-muted-foreground">
+              <span className="text-muted-foreground/70">相机 </span>
+              <span className="text-foreground/70">{camera}</span>
             </span>
           )}
           {photo.lensModel && (
-            <span className="text-zinc-500">
-              <span className="text-zinc-600">镜头 </span>
-              <span className="text-zinc-300">{photo.lensModel}</span>
+            <span className="text-muted-foreground">
+              <span className="text-muted-foreground/70">镜头 </span>
+              <span className="text-foreground/70">{photo.lensModel}</span>
             </span>
           )}
           {exif && (
-            <span className="text-zinc-500">
-              <span className="text-zinc-600">参数 </span>
-              <span className="text-zinc-300">{exif}</span>
+            <span className="text-muted-foreground">
+              <span className="text-muted-foreground/70">参数 </span>
+              <span className="text-foreground/70">{exif}</span>
             </span>
           )}
           {photo.dateTimeOriginal && (
-            <span className="text-zinc-500">
-              <span className="text-zinc-600">拍摄 </span>
-              <span className="text-zinc-300">
+            <span className="text-muted-foreground">
+              <span className="text-muted-foreground/70">拍摄 </span>
+              <span className="text-foreground/70">
                 {formatDate(new Date(photo.dateTimeOriginal))}
               </span>
             </span>
@@ -158,15 +149,15 @@ export default async function PhotoDetailPage({ params }: Props) {
         </div>
 
         {location && (
-          <p className="text-zinc-500 text-sm">
-            📍 <span className="text-zinc-400">{location}</span>
+          <p className="text-muted-foreground text-sm">
+            📍 <span className="text-foreground/60">{location}</span>
           </p>
         )}
 
         {photo.category && (
           <Link
             href={`/?category=${encodeURIComponent(photo.category)}`}
-            className="inline-block rounded-full bg-zinc-900 px-3 py-1 text-xs text-zinc-400 hover:bg-zinc-800 transition-colors"
+            className="inline-block rounded-full bg-card px-3 py-1 text-xs text-foreground/60 hover:bg-muted transition-colors"
           >
             {photo.category}
           </Link>

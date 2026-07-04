@@ -5,7 +5,7 @@ import { useInView } from "react-intersection-observer";
 import { Loader2 } from "lucide-react";
 import type { Photo } from "@prisma/client";
 import { useViewMode } from "@/context/view-mode";
-import { PhotoCard } from "./photo-card";
+import { MemoizedPhotoCard } from "./photo-card";
 import { FeedGallery } from "./feed-gallery";
 import { PhotoLightbox } from "./photo-lightbox";
 
@@ -42,7 +42,7 @@ export function PhotoGrid({
     if (open && photos[index]?.slug) {
       window.history.replaceState(null, "", `/photo/${photos[index].slug}`);
     }
-  }, [open, index, photos]);
+  }, [open, index, photos[index]?.slug]);
 
   const { mode } = useViewMode();
 
@@ -99,12 +99,12 @@ export function PhotoGrid({
     <>
       {/* ── Waterfall ──────────────────────────── */}
       {mode !== "feed" && (
-        <div className="columns-1 gap-2 min-[420px]:columns-2 min-[420px]:gap-3 md:columns-3 md:gap-4 lg:columns-4">
+        <div className="columns-1 gap-4 min-[420px]:columns-2 min-[420px]:gap-3 md:columns-3 md:gap-4 lg:columns-4">
           {photos.map((photo, i) => (
-            <PhotoCard
+            <MemoizedPhotoCard
               key={photo.id}
               photo={photo}
-              priority={i < 4}
+              priority={i < 2}
               onClick={() => {
                 setIndex(i);
                 setOpen(true);
@@ -131,14 +131,14 @@ export function PhotoGrid({
         className="flex items-center justify-center py-12"
       >
         {loading && (
-          <div className="flex items-center gap-2 text-zinc-500">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm">加载中…</span>
           </div>
         )}
 
         {!hasMore && loadedCount > 0 && !loading && (
-          <p className="text-sm text-zinc-600">
+          <p className="text-sm text-muted-foreground/70">
             {loadedCount >= totalCount
               ? `共 ${totalCount} 张照片`
               : "没有更多了"}

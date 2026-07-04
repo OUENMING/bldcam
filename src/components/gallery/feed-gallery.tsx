@@ -1,41 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useImageDisplaySize } from "@/hooks/use-image-display-size";
+import { formatExifLine, formatLocation } from "@/lib/format";
 import type { Photo } from "@prisma/client";
-
-// ── Helpers ────────────────────────────────────────
-
-function formatExifLine(photo: Photo): string {
-  const parts: string[] = [];
-
-  if (photo.focalLength35mm) {
-    parts.push(`${photo.focalLength35mm}mm`);
-  } else if (photo.focalLength) {
-    parts.push(`${photo.focalLength}mm`);
-  }
-
-  if (photo.fNumber) parts.push(`f/${photo.fNumber}`);
-  if (photo.iso) parts.push(`ISO ${photo.iso}`);
-
-  if (photo.exposureTime) {
-    if (photo.exposureTime < 1) {
-      parts.push(`1/${Math.round(1 / photo.exposureTime)}s`);
-    } else {
-      parts.push(`${photo.exposureTime}s`);
-    }
-  }
-
-  return parts.join(" · ");
-}
-
-function formatLocation(photo: Photo): string {
-  return [photo.city, photo.region, photo.country]
-    .filter(Boolean)
-    .join(" · ");
-}
 
 // ── Single feed card ───────────────────────────────
 //
@@ -58,6 +28,7 @@ function FeedCard({
   onClick?: () => void;
 }) {
   const [inView, setInView] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const exifLine = formatExifLine(photo);
   const locationLine = formatLocation(photo);
@@ -75,7 +46,7 @@ function FeedCard({
           observer.disconnect();
         }
       },
-      { threshold: 0.1, rootMargin: "100px" },
+      { threshold: 0.05, rootMargin: "200px" },
     );
 
     observer.observe(el);
@@ -87,15 +58,15 @@ function FeedCard({
       ref={cardRef}
       className={cn(
         "flex w-full flex-col items-center",
-        "transition-all duration-700 ease-out",
-        inView
+        "transition-[opacity,transform] duration-700 ease-out",
+        inView && isLoaded
           ? "translate-y-0 opacity-100"
           : "translate-y-8 opacity-0",
       )}
     >
       {/* ── Image ────────────────────────────────── */}
       <div
-        className="group relative cursor-pointer overflow-hidden rounded-2xl bg-neutral-950 shadow-lg md:rounded-3xl"
+        className="group relative cursor-pointer overflow-hidden rounded-3xl bg-background shadow-lg md:rounded-[2rem]"
         style={{
           width: displaySize.width,
           height: displaySize.height,
@@ -111,14 +82,18 @@ function FeedCard({
           alt={photo.title}
           priority={priority}
           draggable={false}
-          className="object-contain transition-transform duration-700 ease-out group-hover:scale-[1.02]"
+          onLoad={() => setIsLoaded(true)}
+          className={cn(
+            "object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]",
+            isLoaded ? "opacity-100" : "opacity-0",
+          )}
           sizes={`(min-width: 1024px) ${displaySize.width}px, (min-width: 640px) 88vw, 92vw`}
         />
       </div>
 
       {/* ── Info panel ───────────────────────────── */}
       <div className="shrink-0 space-y-0.5 py-3 text-center sm:space-y-1 sm:py-4">
-        <h2 className="font-semibold text-white text-base leading-tight sm:text-xl md:text-2xl">
+        <h2 className="font-semibold text-foreground text-base leading-tight sm:text-xl md:text-2xl">
           {photo.title}
         </h2>
 
@@ -138,6 +113,8 @@ function FeedCard({
   );
 }
 
+const MemoizedFeedCard = memo(FeedCard);
+
 // ── Feed gallery ───────────────────────────────────
 
 interface FeedGalleryProps {
@@ -149,7 +126,7 @@ export function FeedGallery({ photos, onPhotoClick }: FeedGalleryProps) {
   return (
     <div className="mx-auto flex w-[92%] max-w-4xl flex-col items-center gap-10 sm:gap-16 md:gap-20">
       {photos.map((photo, i) => (
-        <FeedCard
+        <MemoizedFeedCard
           key={photo.id}
           photo={photo}
           priority={i < 3}
