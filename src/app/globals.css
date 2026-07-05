@@ -134,3 +134,8 @@
     scrollbar-gutter: stable;
   }
 }
+
+/* Override YARL no-scroll — prevent height:100% from causing vertical layout shift */
+.yarl__no_scroll {
+  height: auto;
+}
