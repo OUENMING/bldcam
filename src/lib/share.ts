@@ -394,20 +394,32 @@ async function renderPhoto(
 ): Promise<Buffer> {
   const { cardW, cardH, radius } = layout;
 
-  // Resize photo to exact card dimensions (cardH already derived from aspect ratio)
+  // Resize — use "inside" so aspect ratio is always preserved
+  // even if cardH is off by 1px from Math.round
   const resized = await sharp(imageBuffer)
-    .resize(cardW, cardH, { fit: "fill" })
+    .resize(cardW, cardH, { fit: "inside", withoutEnlargement: true })
     .png()
     .toBuffer();
 
-  // Apply rounded corners via dest-in mask (single sharp pipeline, no double-encoding)
-  const maskSvg = `<svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg"><rect width="${cardW}" height="${cardH}" rx="${radius}" ry="${radius}" fill="white"/></svg>`;
-  const rounded = await sharp(resized)
-    .composite([{ input: Buffer.from(maskSvg), top: 0, left: 0, blend: "dest-in" }])
-    .png()
-    .toBuffer();
+  // Get actual dimensions after inside-fit
+  const meta = await sharp(resized).metadata();
+  const aW = meta.width ?? cardW;
+  const aH = meta.height ?? cardH;
 
-  return rounded;
+  // Create card canvas with rounded corners via SVG clipPath
+  // Photo sits inside at computed position (centred if portrait)
+  const offX = Math.round((cardW - aW) / 2);
+  const offY = Math.round((cardH - aH) / 2);
+  const base64 = resized.toString("base64");
+
+  const svg = `<svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <clipPath id="cr"><rect width="${cardW}" height="${cardH}" rx="${radius}" ry="${radius}"/></clipPath>
+    </defs>
+    <image href="data:image/png;base64,${base64}" x="${offX}" y="${offY}" width="${aW}" height="${aH}" clip-path="url(#cr)"/>
+  </svg>`;
+
+  return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
 // ── Typography Renderer ───────────────────────────

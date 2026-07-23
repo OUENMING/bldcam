@@ -94,7 +94,7 @@ export function getShareKey(photoId: string): string {
 }
 
 export function getShareKeyV2(photoId: string): string {
-  return `share/${photoId}/classic-v4.png`;
+  return `share/${photoId}/classic-v5.png`;
 }
 
 export function getShareUrl(photoId: string): string {
