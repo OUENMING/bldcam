@@ -81,17 +81,18 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
       <Image
         src={slide.src}
         alt={slide.title}
-        fill
+        width={slide.width}
+        height={slide.height}
         placeholder={slide.blurDataUrl ? "blur" : "empty"}
         blurDataURL={slide.blurDataUrl ?? undefined}
         priority
         onLoad={() => setLoaded(true)}
         className={cn(
-          "object-contain",
+          "max-h-[90svh] w-auto max-w-full object-contain",
           "transition-opacity duration-700 ease-out",
           loaded ? "opacity-100" : "opacity-0",
         )}
-        sizes="(max-width: 768px) 100vw, 80vw"
+        sizes="90vw"
       />
 
       {/* ── EXIF overlay ──────────────────────── */}
