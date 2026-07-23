@@ -250,27 +250,6 @@ function esc(s: string): string {
 //   Each SVG builder returns a string. Sharp renders it to PNG.
 // ═══════════════════════════════════════════════════════════
 
-/** Rounded-rect clip path wrapping a base64-encoded photo image.
- *  preserveAspectRatio="xMidYMid meet" — never crop, no stretch. */
-function buildPhotoCardSvg(
-  imageBase64: string,
-  cardW: number,
-  cardH: number,
-  radius: number,
-): string {
-  return `<svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <clipPath id="cr">
-        <rect width="${cardW}" height="${cardH}" rx="${radius}" ry="${radius}"/>
-      </clipPath>
-    </defs>
-    <image href="data:image/webp;base64,${imageBase64}"
-           width="${cardW}" height="${cardH}"
-           preserveAspectRatio="xMidYMid meet"
-           clip-path="url(#cr)"/>
-  </svg>`;
-}
-
 /** A rounded rect filled with black at a given opacity — used for shadow layers. */
 function buildShadowSvg(w: number, h: number, radius: number, opacity: number): string {
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
@@ -415,15 +394,20 @@ async function renderPhoto(
 ): Promise<Buffer> {
   const { cardW, cardH, radius } = layout;
 
+  // Resize photo to exact card dimensions (cardH already derived from aspect ratio)
   const resized = await sharp(imageBuffer)
     .resize(cardW, cardH, { fit: "fill" })
-    .webp({ quality: 85 })
+    .png()
     .toBuffer();
 
-  const base64 = resized.toString("base64");
-  const svg = buildPhotoCardSvg(base64, cardW, cardH, radius);
+  // Apply rounded corners via dest-in mask (single sharp pipeline, no double-encoding)
+  const maskSvg = `<svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg"><rect width="${cardW}" height="${cardH}" rx="${radius}" ry="${radius}" fill="white"/></svg>`;
+  const rounded = await sharp(resized)
+    .composite([{ input: Buffer.from(maskSvg), top: 0, left: 0, blend: "dest-in" }])
+    .png()
+    .toBuffer();
 
-  return sharp(Buffer.from(svg)).png().toBuffer();
+  return rounded;
 }
 
 // ── Typography Renderer ───────────────────────────
