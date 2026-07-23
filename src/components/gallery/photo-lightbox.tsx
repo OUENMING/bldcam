@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
 import Lightbox from "yet-another-react-lightbox";
+import { useLightboxState } from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
 import { Download, Share2 } from "lucide-react";
@@ -39,12 +40,7 @@ interface ExifSlide {
 
 // ── Custom Slide Render ─────────────────────────
 
-interface CustomSlideProps {
-  slide: ExifSlide;
-  onShare?: (photoId: string) => void;
-}
-
-function CustomSlide({ slide, onShare }: CustomSlideProps) {
+function CustomSlide({ slide }: { slide: ExifSlide }) {
   const [loaded, setLoaded] = useState(false);
 
   // ── Build EXIF line ─────────────────────────
@@ -98,30 +94,7 @@ function CustomSlide({ slide, onShare }: CustomSlideProps) {
         sizes="(max-width: 768px) 100vw, 80vw"
       />
 
-      {/* ── Top-right action buttons ───────────── */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-end gap-2 bg-gradient-to-b from-black/50 to-transparent px-3 py-2 sm:px-4 sm:py-3">
-            <a
-              href={`/api/photos/${slide.id}/download`}
-              download
-              className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white/80 backdrop-blur-sm transition-colors hover:bg-black/80 hover:text-white"
-              title="下载原图"
-            >
-              <Download className="h-4 w-4" />
-            </a>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onShare?.(slide.id);
-              }}
-              className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white/80 backdrop-blur-sm transition-colors hover:bg-black/80 hover:text-white"
-              title="生成分享图"
-            >
-              <Share2 className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* ── EXIF overlay ──────────────────────── */}
+      {/* ── EXIF overlay ──────────────────────── */}
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/80 px-4 pt-10 text-center md:px-6"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
@@ -154,6 +127,50 @@ function CustomSlide({ slide, onShare }: CustomSlideProps) {
         )}
       </div>
     </div>
+  );
+}
+
+// ── YARL Toolbar Buttons ────────────────────────────
+//
+// These use YARL's context hooks (useLightboxState) to access
+// the current slide's data. They slot into the Lightbox toolbar
+// alongside the native Close button, avoiding z-index conflicts.
+
+function LightboxDownloadButton() {
+  const { slides, currentIndex } = useLightboxState();
+  const slide = slides[currentIndex] as unknown as ExifSlide;
+
+  return (
+    <a
+      href={`/api/photos/${slide.id}/download`}
+      download
+      className="yarl__button"
+      title="下载原图"
+      style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+    >
+      <Download className="h-4 w-4" />
+    </a>
+  );
+}
+
+function LightboxShareButton({
+  onShare,
+}: {
+  onShare?: (photoId: string) => void;
+}) {
+  const { slides, currentIndex } = useLightboxState();
+  const slide = slides[currentIndex] as unknown as ExifSlide;
+
+  return (
+    <button
+      type="button"
+      className="yarl__button"
+      title="生成分享图"
+      onClick={() => onShare?.(slide.id)}
+      style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+    >
+      <Share2 className="h-4 w-4" />
+    </button>
   );
 }
 
@@ -206,6 +223,16 @@ export function PhotoLightbox({
     [photos],
   );
 
+  // Memoize toolbar buttons so they don't recreate every render
+  const toolbarButtons = useMemo<(string | React.ReactNode)[]>(
+    () => [
+      <LightboxDownloadButton key="download" />,
+      <LightboxShareButton key="share" onShare={onShare} />,
+      "close",
+    ],
+    [onShare],
+  );
+
   return (
     <Lightbox
       open={open}
@@ -226,9 +253,10 @@ export function PhotoLightbox({
         zoomInMultiplier: 2,
         scrollToZoom: true,
       }}
+      toolbar={{ buttons: toolbarButtons }}
       render={{
         slide: ({ slide }) => (
-          <CustomSlide slide={slide as ExifSlide} onShare={onShare} />
+          <CustomSlide slide={slide as ExifSlide} />
         ),
         buttonZoom: () => null,
       }}
