@@ -301,7 +301,8 @@ function buildExifTextSvg(
   const displayBrand = hasContent ? (brand ?? "BLDcam") : "BLDcam";
 
   const cx = Math.round(canvasW / 2);
-  const y = Math.round(textBarH / 2);
+  // Visual center: text sits slightly below mathematical center within the footer
+  const y = Math.round(textBarH * 0.55);
 
   // Brand span
   const brandSpan =
@@ -491,7 +492,7 @@ export interface ShareResult {
  *   Layout Engine  → computes canvas & card dimensions
  *   Background     → blurred, desaturated from photo
  *   Overlay        → optional tonal unification (not a vignette)
- *   Shadow         → double floating-card shadow
+ *   Shadow         → 3-layer optical floating-card shadow
  *   Photo          → resized + rounded corners, no crop
  *   Typography     → centred single-line EXIF text on transparent bg
  *   Composite      → assembles all layers bottom-to-top
