@@ -26,6 +26,7 @@ rsync -avz --delete \
   --exclude='ecosystem.config.cjs' \
   --exclude='logs/' \
   --exclude='backups/' \
+  --exclude='node_modules/' \
   -e "ssh -p $PORT -i $SSH_KEY" \
   "$DIST/" "$VPS:/home/bldcam/"
 
