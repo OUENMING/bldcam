@@ -1,29 +1,125 @@
 import sharp from "sharp";
 import type { Photo } from "@prisma/client";
 
-// ═══════════════════════════════════════════════════════
-// Theme — all visual parameters in one place
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// THEME — canonical source of all visual parameters
+//
+// To calibrate against a reference image:
+//   1. Overlay the generated PNG on the reference in any photo editor
+//   2. Use "Difference" blend mode — pure black = perfect match
+//   3. Blink-comparison (toggle visibility) reveals size/position issues
+//   4. Tweak the values below — never change renderer code
+//
+// Every visual number lives here. No renderer has hardcoded values.
+// ═══════════════════════════════════════════════════════════
 
-interface ShareTheme {
-  canvas: { width: number; padding: number; radius: number; textBarH: number };
-  background: { blur: number; scale: number; brightness: number; saturation: number; overlayRgb: string; overlayAlpha: number };
-  shadow: { blur1: number; opacity1: number; offsetY1: number; blur2: number; opacity2: number; offsetY2: number };
-  typography: { brandSize: number; paramSize: number; paramGap: number; fontFamily: string; brandWeight: number; paramWeight: number };
-  vignette: { opacity: number; innerStop: number };
+export const CLASSIC_THEME = {
+  // ── Canvas ──────────────────────────────────────
+  canvas: {
+    /** Canonical width in px — all layout derives from this */
+    width: 1440,
+    /** Uniform inset from canvas edges for photo card */
+    padding: 90,
+    /** Photo card corner radius */
+    radius: 24,
+    /** Vertical space reserved for EXIF text below the photo card */
+    textBarH: 96,
+  },
+
+  // ── Background (generated from the photo itself) ──
+  background: {
+    /**
+     * Gaussian blur sigma in px.
+     * Higher = softer mood / Lower = more recognizable background.
+     * Calibrate by comparing edge softness between generated and reference.
+     */
+    blur: 52,
+    /**
+     * Scale factor before blur. >1 prevents blur edge artifacts
+     * (directional smearing near canvas borders).
+     */
+    scale: 1.08,
+    /**
+     * Brightness multiplier. 0.88 = 88% of original luminance.
+     * Keep the background visible but subdued — don't crush to black.
+     */
+    brightness: 0.88,
+    /**
+     * Saturation multiplier. 0.90 = very slightly desaturated.
+     * Prevents the blurred background from competing with the photo.
+     */
+    saturation: 0.90,
+  },
+
+  // ── Tonal overlay (unifies background, not a vignette) ──
+  overlay: {
+    /**
+     * Solid tint over the entire background canvas.
+     * Purpose: subtly unify bg luminance so no region is distractingly bright.
+     * This is NOT a vignette — there is no radial falloff.
+     * Set alpha to 0 to disable.
+     */
+    rgb: "8,10,8",
+    alpha: 0.06,
+  },
+
+  // ── Double shadow (Apple / Leica floating card style) ──
+  shadow: {
+    /** Tighter, darker shadow — gives "just lifted off surface" feel */
+    shadow1: { blur: 18, opacity: 0.18, offsetY: 8 },
+    /** Softer, wider shadow — gives ambient depth */
+    shadow2: { blur: 42, opacity: 0.10, offsetY: 18 },
+  },
+
+  // ── Typography ───────────────────────────────────
+  typography: {
+    /** Camera brand font size */
+    brandSize: 58,
+    /** EXIF parameter font size */
+    paramSize: 26,
+    /** Horizontal gap between brand name and first parameter (SVG dx) */
+    paramGap: 18,
+    /** Font stack — Helvetica Neue preferred, graceful fallback to Arial */
+    fontFamily: `"Helvetica Neue","Arial","Helvetica",sans-serif`,
+    /** Brand name: italic 900 for bold photographic identity */
+    brandWeight: 900,
+    /** EXIF params: regular 400 for clean data presentation */
+    paramWeight: 400,
+  },
+
+  // ── Output ───────────────────────────────────────
+  output: {
+    /** PNG compression quality 0-100 */
+    quality: 92,
+  },
+} as const;
+
+// ═══════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════
+
+export type ShareTheme = typeof CLASSIC_THEME;
+
+/** Layout computed from a specific photo's dimensions */
+interface Layout {
+  canvasW: number;
+  canvasH: number;
+  cardW: number;
+  cardH: number;
+  padX: number;
+  padTop: number;
+  textBarH: number;
+  textCenterY: number;
+  radius: number;
 }
 
-const CLASSIC: ShareTheme = {
-  canvas: { width: 1440, padding: 90, radius: 24, textBarH: 96 },
-  background: { blur: 52, scale: 1.08, brightness: 0.88, saturation: 0.90, overlayRgb: "8,10,8", overlayAlpha: 0.12 },
-  shadow: { blur1: 18, opacity1: 0.18, offsetY1: 8, blur2: 42, opacity2: 0.10, offsetY2: 18 },
-  typography: { brandSize: 58, paramSize: 26, paramGap: 16, fontFamily: `"Helvetica Neue","Arial","Helvetica",sans-serif`, brandWeight: 900, paramWeight: 400 },
-  vignette: { opacity: 0.10, innerStop: 60 },
-};
+interface ExifSegment {
+  text: string;
+}
 
-// ═══════════════════════════════════════════════════════
-// Brand display-name map — keep original casing
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// BRAND MAP — keep manufacturer identity, not raw EXIF string
+// ═══════════════════════════════════════════════════════════
 
 const BRAND_DISPLAY: Record<string, string> = {
   NIKON: "Nikon",
@@ -53,259 +149,356 @@ function brandDisplayName(make: string | null): string | null {
   return BRAND_DISPLAY[trimmed] ?? trimmed;
 }
 
-// ═══════════════════════════════════════════════════════
-// EXIF formatting
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// LAYOUT ENGINE
+//   Input: photo width, photo height
+//   Output: Layout (canvasH is auto-computed from photo aspect)
+// ═══════════════════════════════════════════════════════════
 
-function formatFocalLength(value: number | null | undefined): string | null {
-  if (value == null) return null;
-  return `${Math.round(value)}mm`;
+function computeLayout(photoW: number, photoH: number, theme: ShareTheme): Layout {
+  const { width, padding, radius, textBarH } = theme.canvas;
+  const aspect = photoW / photoH;
+
+  // Card always fills canvas-width minus padding; height derives from aspect
+  const cardW = width - 2 * padding;
+  const cardH = Math.round(cardW / aspect);
+
+  // Canvas height = top padding + card + text bar + bottom padding
+  const canvasH = padding + cardH + textBarH + padding;
+
+  return {
+    canvasW: width,
+    canvasH,
+    cardW,
+    cardH,
+    padX: padding,
+    padTop: padding,
+    textBarH,
+    textCenterY: padding + cardH + Math.round(textBarH / 2),
+    radius,
+  };
 }
 
-function formatFNumber(value: number | null | undefined): string | null {
-  if (value == null) return null;
-  return `F${value}`;
+// ═══════════════════════════════════════════════════════════
+// EXIF FORMATTERS — each parameter has a dedicated formatter
+// ═══════════════════════════════════════════════════════════
+
+function formatFocalLength(v: number | null | undefined): string | null {
+  if (v == null) return null;
+  return `${Math.round(v)}mm`;
 }
 
-function formatExposure(seconds: number | null | undefined): string | null {
-  if (!seconds || seconds <= 0) return null;
-  if (seconds < 1) return `1/${Math.round(1 / seconds)}s`;
-  if (seconds === 1) return "1s";
-  return `${seconds}s`;
+function formatFNumber(v: number | null | undefined): string | null {
+  if (v == null) return null;
+  return `F${v}`;
 }
 
-function formatIso(value: number | null | undefined): string | null {
-  if (value == null) return null;
-  return `ISO${value}`;
+function formatExposure(v: number | null | undefined): string | null {
+  if (!v || v <= 0) return null;
+  if (v < 1) return `1/${Math.round(1 / v)}s`;
+  if (v === 1) return "1s";
+  return `${v}s`;
 }
 
-interface ExifSegment {
-  text: string;
+function formatIso(v: number | null | undefined): string | null {
+  if (v == null) return null;
+  return `ISO${v}`;
 }
 
 function buildExifSegments(photo: Photo): ExifSegment[] {
   const segs: ExifSegment[] = [];
   const fl = photo.focalLength35mm ?? photo.focalLength;
-  const flText = formatFocalLength(fl);
-  if (flText) segs.push({ text: flText });
-  const fnText = formatFNumber(photo.fNumber);
-  if (fnText) segs.push({ text: fnText });
-  const etText = formatExposure(photo.exposureTime);
-  if (etText) segs.push({ text: etText });
-  const isoText = formatIso(photo.iso);
-  if (isoText) segs.push({ text: isoText });
+  const t = formatFocalLength(fl);
+  if (t) segs.push({ text: t });
+  const t2 = formatFNumber(photo.fNumber);
+  if (t2) segs.push({ text: t2 });
+  const t3 = formatExposure(photo.exposureTime);
+  if (t3) segs.push({ text: t3 });
+  const t4 = formatIso(photo.iso);
+  if (t4) segs.push({ text: t4 });
   return segs;
 }
 
-// ═══════════════════════════════════════════════════════
-// XML escape
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// XML ESCAPE
+// ═══════════════════════════════════════════════════════════
 
 function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-// ═══════════════════════════════════════════════════════
-// Layout
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// ── SVG PRIMITIVES ────────────────────────────────────────
+//   Each SVG builder returns a string. Sharp renders it to PNG.
+// ═══════════════════════════════════════════════════════════
 
-interface Layout {
-  canvasW: number;
-  canvasH: number;
-  cardW: number;
-  cardH: number;
-  padX: number;
-  padTop: number;
-  textBarH: number;
-  textCenterY: number;
-  radius: number;
-}
-
-function computeLayout(photoW: number, photoH: number): Layout {
-  const t = CLASSIC;
-  const aspect = photoW / photoH;
-  const cardW = t.canvas.width - 2 * t.canvas.padding;           // 1260
-  const cardH = Math.round(cardW / aspect);                       // keeps original ratio — no crop
-  const canvasH = t.canvas.padding + cardH + t.canvas.textBarH + t.canvas.padding;
-
-  return {
-    canvasW: t.canvas.width,
-    canvasH,
-    cardW,
-    cardH,
-    padX: t.canvas.padding,
-    padTop: t.canvas.padding,
-    textBarH: t.canvas.textBarH,
-    textCenterY: t.canvas.padding + cardH + Math.round(t.canvas.textBarH / 2),
-    radius: t.canvas.radius,
-  };
-}
-
-// ═══════════════════════════════════════════════════════
-// SVG builders
-// ═══════════════════════════════════════════════════════
-
-/** Photo card with rounded corners (clipPath) — displayed at exact cardW × cardH */
-function photoCardSvg(imageBase64: string, cardW: number, cardH: number, radius: number): string {
+/** Rounded-rect clip path wrapping a base64-encoded photo image.
+ *  preserveAspectRatio="xMidYMid meet" — never crop, no stretch. */
+function buildPhotoCardSvg(
+  imageBase64: string,
+  cardW: number,
+  cardH: number,
+  radius: number,
+): string {
   return `<svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <clipPath id="rc">
+      <clipPath id="cr">
         <rect width="${cardW}" height="${cardH}" rx="${radius}" ry="${radius}"/>
       </clipPath>
     </defs>
     <image href="data:image/webp;base64,${imageBase64}"
            width="${cardW}" height="${cardH}"
            preserveAspectRatio="xMidYMid meet"
-           clip-path="url(#rc)"/>
+           clip-path="url(#cr)"/>
   </svg>`;
 }
 
-/** Shadow: a dark rounded rect, rendered as separate layer. */
-function shadowSvg(w: number, h: number, radius: number, opacity: number): string {
+/** A rounded rect filled with black at a given opacity — used for shadow layers. */
+function buildShadowSvg(w: number, h: number, radius: number, opacity: number): string {
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${w}" height="${h}" rx="${radius}" ry="${radius}" fill="rgba(0,0,0,${opacity})"/>
   </svg>`;
 }
 
-/** Background overlay — very light tint to unify the blurred bg. */
-function overlaySvg(w: number, h: number, rgb: string, alpha: number): string {
+/** Full-canvas solid rect — tonal overlay to unify background brightness. */
+function buildOverlaySvg(w: number, h: number, rgb: string, alpha: number): string {
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${w}" height="${h}" fill="rgba(${rgb},${alpha})"/>
   </svg>`;
 }
 
-/** Subtle vignette for photo card — dark-green radial gradient. */
-function vignetteSvg(w: number, h: number, innerStop: number, opacity: number): string {
-  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <radialGradient id="vig" cx="50%" cy="50%" r="75%">
-        <stop offset="${innerStop}%" stop-color="#0a0f08" stop-opacity="0"/>
-        <stop offset="100%" stop-color="#0a0f08" stop-opacity="${opacity}"/>
-      </radialGradient>
-    </defs>
-    <rect width="${w}" height="${h}" fill="url(#vig)"/>
-  </svg>`;
-}
-
-/** EXIF text bar — transparent background, centred brand + per-field param spans. */
-function exifTextSvg(canvasW: number, textBarH: number, textCenterY: number, photo: Photo): string {
-  const t = CLASSIC.typography;
+/** EXIF text bar — transparent background, horizontal centre-aligned.
+ *  Brand name (italic 900) + per-parameter spans (regular 400) in one line.
+ *  Each parameter is a separate <tspan> so a missing field doesn't break layout. */
+function buildExifTextSvg(
+  canvasW: number,
+  textBarH: number,
+  photo: Photo,
+  theme: ShareTheme,
+): string {
+  const ty = theme.typography;
   const brand = brandDisplayName(photo.make);
   const segs = buildExifSegments(photo);
   const hasContent = brand || segs.length > 0;
-
   const displayBrand = hasContent ? (brand ?? "BLDcam") : "BLDcam";
-  const cx = Math.round(canvasW / 2);
-  const y = Math.round(textBarH / 2); // relative to the text bar SVG
 
-  // Build centred group: brand on the left, params after a gap
-  let textElem = "";
-  if (segs.length > 0) {
-    const segSpans = segs.map((s, i) => {
-      const dx = i === 0 ? t.paramGap : t.paramGap;
-      return `<tspan dx="${dx}" font-weight="${t.paramWeight}" font-size="${t.paramSize}" fill-opacity="0.9">${esc(s.text)}</tspan>`;
-    }).join("");
-    textElem =
-      `<tspan font-style="italic" font-weight="${t.brandWeight}" font-size="${t.brandSize}">${esc(displayBrand)}</tspan>${segSpans}`;
-  } else {
-    textElem =
-      `<tspan font-style="italic" font-weight="${t.brandWeight}" font-size="${t.brandSize}">${esc(displayBrand)}</tspan>`;
-  }
+  const cx = Math.round(canvasW / 2);
+  const y = Math.round(textBarH / 2);
+
+  // Brand span
+  const brandSpan =
+    `<tspan font-style="italic" font-weight="${ty.brandWeight}" font-size="${ty.brandSize}">${esc(displayBrand)}</tspan>`;
+
+  // Parameter spans — each gets dx="${paramGap}" so a missing field doesn't collapse spacing
+  const paramSpans = segs.map((s, i) => {
+    const dx = i === 0 ? ty.paramGap : ty.paramGap;
+    return `<tspan dx="${dx}" font-weight="${ty.paramWeight}" font-size="${ty.paramSize}" fill-opacity="0.9">${esc(s.text)}</tspan>`;
+  }).join("");
 
   return `<svg width="${canvasW}" height="${textBarH}" xmlns="http://www.w3.org/2000/svg">
-    <text x="${cx}" y="${y}" font-family="${t.fontFamily}" fill="#ffffff"
-          text-anchor="middle" dominant-baseline="central">
-      ${textElem}
+    <text x="${cx}" y="${y}"
+          font-family="${ty.fontFamily}"
+          fill="#ffffff"
+          text-anchor="middle"
+          dominant-baseline="central">
+      ${brandSpan}${paramSpans}
     </text>
   </svg>`;
 }
 
-// ═══════════════════════════════════════════════════════
-// Main pipeline
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// ── RENDERERS ─────────────────────────────────────────────
+//   Each renderer takes inputs → produces a PNG Buffer.
+//   They are called by the CompositeRenderer in order.
+// ═══════════════════════════════════════════════════════════
+
+// ── Background Renderer ───────────────────────────
+
+async function renderBackground(
+  imageBuffer: Buffer,
+  layout: Layout,
+  theme: ShareTheme,
+): Promise<Buffer> {
+  const { scale, blur, brightness, saturation } = theme.background;
+
+  // Scale up before blur to avoid directional edge smearing
+  const bgW = Math.round(layout.canvasW * scale);
+  const bgH = Math.round(layout.canvasH * scale);
+  const offsetX = Math.round((bgW - layout.canvasW) / 2);
+  const offsetY = Math.round((bgH - layout.canvasH) / 2);
+
+  return sharp(imageBuffer)
+    .resize(bgW, bgH, { fit: "cover", position: "centre" })
+    .extract({ left: offsetX, top: offsetY, width: layout.canvasW, height: layout.canvasH })
+    .blur(blur)
+    .modulate({ brightness, saturation })
+    .png()
+    .toBuffer();
+}
+
+// ── Overlay Renderer ──────────────────────────────
+//   Optional. Set overlay.alpha = 0 in theme to disable.
+
+async function renderOverlay(
+  layout: Layout,
+  theme: ShareTheme,
+): Promise<Buffer | null> {
+  const { alpha } = theme.overlay;
+  if (alpha <= 0) return null;
+
+  return sharp(
+    Buffer.from(buildOverlaySvg(layout.canvasW, layout.canvasH, theme.overlay.rgb, alpha)),
+  ).png().toBuffer();
+}
+
+// ── Shadow Renderer ───────────────────────────────
+//   Returns two buffers: tight shadow + ambient shadow.
+
+async function renderShadows(
+  layout: Layout,
+  theme: ShareTheme,
+): Promise<{ shadow1: Buffer; shadow2: Buffer }> {
+  const { cardW, cardH, radius } = layout;
+  const { shadow1: s1, shadow2: s2 } = theme.shadow;
+
+  const [buf1, buf2] = await Promise.all([
+    sharp(Buffer.from(buildShadowSvg(cardW, cardH, radius, s1.opacity)))
+      .blur(s1.blur)
+      .png()
+      .toBuffer(),
+    sharp(Buffer.from(buildShadowSvg(cardW, cardH, radius, s2.opacity)))
+      .blur(s2.blur)
+      .png()
+      .toBuffer(),
+  ]);
+
+  return { shadow1: buf1, shadow2: buf2 };
+}
+
+// ── Photo Renderer ────────────────────────────────
+//   Resizes photo to exact card dimensions (width fills, height from aspect),
+//   then clips to rounded rect via SVG clipPath.
+
+async function renderPhoto(
+  imageBuffer: Buffer,
+  layout: Layout,
+): Promise<Buffer> {
+  const { cardW, cardH, radius } = layout;
+
+  const resized = await sharp(imageBuffer)
+    .resize(cardW, cardH, { fit: "fill" })
+    .webp({ quality: 85 })
+    .toBuffer();
+
+  const base64 = resized.toString("base64");
+  const svg = buildPhotoCardSvg(base64, cardW, cardH, radius);
+
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+// ── Typography Renderer ───────────────────────────
+
+async function renderTypography(
+  layout: Layout,
+  photo: Photo,
+  theme: ShareTheme,
+): Promise<Buffer> {
+  const svg = buildExifTextSvg(layout.canvasW, layout.textBarH, photo, theme);
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+// ── Composite Renderer ────────────────────────────
+
+async function renderComposite(
+  background: Buffer,
+  overlay: Buffer | null,
+  shadows: { shadow1: Buffer; shadow2: Buffer },
+  photoCard: Buffer,
+  typography: Buffer,
+  layout: Layout,
+  theme: ShareTheme,
+): Promise<Buffer> {
+  const { padX, padTop, cardH } = layout;
+  const { shadow1: s1, shadow2: s2 } = theme.shadow;
+
+  const layers: sharp.OverlayOptions[] = [];
+
+  // Optional tonal overlay
+  if (overlay) {
+    layers.push({ input: overlay, top: 0, left: 0 });
+  }
+
+  // Double shadow (rendered behind the photo card)
+  layers.push({ input: shadows.shadow1, top: padTop + s1.offsetY, left: padX });
+  layers.push({ input: shadows.shadow2, top: padTop + s2.offsetY, left: padX });
+
+  // Photo card
+  layers.push({ input: photoCard, top: padTop, left: padX });
+
+  // EXIF text below the card
+  layers.push({ input: typography, top: padTop + cardH, left: 0 });
+
+  return sharp(background)
+    .composite(layers)
+    .png({ quality: theme.output.quality })
+    .toBuffer();
+}
+
+// ═══════════════════════════════════════════════════════════
+// ── PUBLIC API ────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+
+export interface ShareResult {
+  buffer: Buffer;
+  layout: Layout;
+}
 
 /**
  * Generate a share card image.
  *
- * Layer stack (bottom → top):
- *  1. Blurred + modulated background (scale 108%, blur 52, brightness 0.88)
- *  2. Tint overlay (rgba(8,10,8, 0.12))
- *  3. Shadow 1 (opacity 0.18, blur 18, offsetY 8)
- *  4. Shadow 2 (opacity 0.10, blur 42, offsetY 18)
- *  5. Photo card (rounded corners, preserve aspect ratio)
- *  6. Vignette (dark-green radial, opacity 0.10)
- *  7. EXIF text (transparent background, centred)
+ * Pipeline:
+ *   Layout Engine  → computes canvas & card dimensions
+ *   Background     → blurred, desaturated from photo
+ *   Overlay        → optional tonal unification (not a vignette)
+ *   Shadow         → double floating-card shadow
+ *   Photo          → resized + rounded corners, no crop
+ *   Typography     → centred single-line EXIF text on transparent bg
+ *   Composite      → assembles all layers bottom-to-top
+ *
+ * Pass a different `theme` to calibrate or create variants.
  */
 export async function generateShareImage(
   photo: Photo,
   imageBuffer: Buffer,
-): Promise<Buffer> {
-  const t = CLASSIC;
+  theme: ShareTheme = CLASSIC_THEME,
+): Promise<ShareResult> {
+  // Step 0: measure photo → compute layout
   const meta = await sharp(imageBuffer).metadata();
-  const photoW = meta.width ?? 1200;
-  const photoH = meta.height ?? 800;
-  const layout = computeLayout(photoW, photoH);
+  const layout = computeLayout(meta.width ?? 1200, meta.height ?? 800, theme);
 
-  // ── 1. Background ──────────────────────────────────
-  // Slightly scale up so blur doesn't show directional edges
-  const bgW = Math.round(layout.canvasW * t.background.scale);
-  const bgH = Math.round(layout.canvasH * t.background.scale);
-  const bgOffsetX = Math.round((bgW - layout.canvasW) / 2);
-  const bgOffsetY = Math.round((bgH - layout.canvasH) / 2);
+  // Step 1–5: run independent renderers in parallel where possible
+  const [background, overlay, shadows, photoCard, typography] = await Promise.all([
+    renderBackground(imageBuffer, layout, theme),
+    renderOverlay(layout, theme),
+    renderShadows(layout, theme),
+    renderPhoto(imageBuffer, layout),
+    renderTypography(layout, photo, theme),
+  ]);
 
-  const bgBlur = await sharp(imageBuffer)
-    .resize(bgW, bgH, { fit: "cover", position: "centre" })
-    .extract({ left: bgOffsetX, top: bgOffsetY, width: layout.canvasW, height: layout.canvasH })
-    .blur(t.background.blur)
-    .modulate({ brightness: t.background.brightness, saturation: t.background.saturation })
-    .png()
-    .toBuffer();
+  // Step 6: layer them back-to-front
+  const buffer = await renderComposite(
+    background,
+    overlay,
+    shadows,
+    photoCard,
+    typography,
+    layout,
+    theme,
+  );
 
-  // ── 2. Background overlay ──────────────────────────
-  const overlayBuf = await sharp(
-    Buffer.from(overlaySvg(layout.canvasW, layout.canvasH, t.background.overlayRgb, t.background.overlayAlpha)),
-  ).png().toBuffer();
-
-  // ── 3 & 4. Double shadow ───────────────────────────
-  const s = t.shadow;
-  const shadow1Buf = await sharp(
-    Buffer.from(shadowSvg(layout.cardW, layout.cardH, layout.radius, s.opacity1)),
-  ).blur(s.blur1).png().toBuffer();
-
-  const shadow2Buf = await sharp(
-    Buffer.from(shadowSvg(layout.cardW, layout.cardH, layout.radius, s.opacity2)),
-  ).blur(s.blur2).png().toBuffer();
-
-  // ── 5. Photo card (resized + rounded corners) ──────
-  const photoResized = await sharp(imageBuffer)
-    .resize(layout.cardW, layout.cardH, { fit: "fill" })
-    .webp({ quality: 85 })
-    .toBuffer();
-  const photoBase64 = photoResized.toString("base64");
-  const photoSvgStr = photoCardSvg(photoBase64, layout.cardW, layout.cardH, layout.radius);
-  const photoBuf = await sharp(Buffer.from(photoSvgStr)).png().toBuffer();
-
-  // ── 6. Vignette overlay ────────────────────────────
-  const vigBuf = await sharp(
-    Buffer.from(vignetteSvg(layout.cardW, layout.cardH, t.vignette.innerStop, t.vignette.opacity)),
-  ).png().toBuffer();
-
-  // ── 7. EXIF text ───────────────────────────────────
-  const textSvgStr = exifTextSvg(layout.canvasW, layout.textBarH, layout.textCenterY, photo);
-  const textBuf = await sharp(Buffer.from(textSvgStr)).png().toBuffer();
-
-  // ── Final composite ────────────────────────────────
-  const final = await sharp(bgBlur)
-    .composite([
-      { input: overlayBuf, top: 0, left: 0 },
-      { input: shadow1Buf, top: layout.padTop + s.offsetY1, left: layout.padX },
-      { input: shadow2Buf, top: layout.padTop + s.offsetY2, left: layout.padX },
-      { input: photoBuf, top: layout.padTop, left: layout.padX },
-      { input: vigBuf, top: layout.padTop, left: layout.padX },
-      { input: textBuf, top: layout.padTop + layout.cardH, left: 0 },
-    ])
-    .png({ quality: 92 })
-    .toBuffer();
-
-  return final;
+  return { buffer, layout };
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateShareImage } from "@/lib/share";
-import { uploadToR2, getShareKeyV2, getShareUrl } from "@/lib/r2";
+import { uploadToR2, getShareKeyV2, getPublicUrl } from "@/lib/r2";
 
 // ═══════════════════════════════════════════════════════
 // GET /api/photos/[id]/share
@@ -26,8 +26,9 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // ── Check R2 cache ──────────────────────────────
-    const shareUrl = getShareUrl(id);
+    // ── Check R2 cache (v2 key) ────────────────────
+    const shareKey = getShareKeyV2(id);
+    const shareUrl = getPublicUrl(shareKey);
     try {
       const head = await fetch(shareUrl, { method: "HEAD" });
       if (head.ok) {
@@ -52,10 +53,9 @@ export async function GET(
     const srcBuf = Buffer.from(await srcRes.arrayBuffer());
 
     // ── Generate share card ─────────────────────────
-    const pngBuf = await generateShareImage(photo, srcBuf);
+    const { buffer: pngBuf } = await generateShareImage(photo, srcBuf);
 
     // ── Upload to R2 cache (async, don't block response) ──
-    const shareKey = getShareKeyV2(id);
     uploadToR2(shareKey, pngBuf, "image/png").catch((e) =>
       console.warn("Share: R2 cache upload failed:", e),
     );
