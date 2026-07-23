@@ -86,6 +86,17 @@ export async function deleteFromR2(keys: string[]): Promise<void> {
  * e.g. "https://pub-xxx.r2.dev/photos/2026/06/uuid.webp"
  *   → "photos/2026/06/uuid.webp"
  */
+/**
+ * Deterministic R2 key and URL for share images.
+ */
+export function getShareKey(photoId: string): string {
+  return `share/${photoId}/classic.png`;
+}
+
+export function getShareUrl(photoId: string): string {
+  return `${R2_PUBLIC_URL}/${getShareKey(photoId)}`;
+}
+
 export function extractKeyFromUrl(url: string): string | null {
   // Try current CDN domain first, then R2's default public host
   const parts =

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatExifLine, formatLocation } from "@/lib/format";
+import { PhotoActions } from "@/components/gallery/photo-actions";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -162,6 +163,12 @@ export default async function PhotoDetailPage({ params }: Props) {
             {photo.category}
           </Link>
         )}
+
+        {/* ── Actions: download + share ────────── */}
+        <PhotoActions
+          photoId={photo.id}
+          photoTitle={photo.title}
+        />
       </div>
     </div>
   );

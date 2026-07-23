@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { deleteFromR2, extractKeyFromUrl } from "@/lib/r2";
+import { deleteFromR2, extractKeyFromUrl, getShareKey } from "@/lib/r2";
 import { pipeline } from "@/lib/image/pipeline";
 import { generateSlug } from "@/lib/slug";
 
@@ -222,6 +222,9 @@ export async function DELETE(request: NextRequest) {
       const thumbKey = extractKeyFromUrl(photo.thumbnailUrl);
       if (thumbKey) keys.push(thumbKey);
     }
+
+    // Clean up cached share image if it exists
+    keys.push(getShareKey(id));
 
     // ── Delete from R2 first (best-effort) ─────────
     // It's OK if R2 delete partially fails — the DB record

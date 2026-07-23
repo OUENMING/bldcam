@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
+import { Download, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate, formatExposureTime, formatGps, formatAperture, formatLocation } from "@/lib/format";
 import type { Photo } from "@prisma/client";
@@ -18,6 +19,8 @@ interface ExifSlide {
   blurDataUrl: string | null;
   title: string;
   description: string;
+  id: string;
+  slug: string | null;
   make: string | null;
   model: string | null;
   lensModel: string | null;
@@ -36,7 +39,12 @@ interface ExifSlide {
 
 // ── Custom Slide Render ─────────────────────────
 
-function CustomSlide({ slide }: { slide: ExifSlide }) {
+interface CustomSlideProps {
+  slide: ExifSlide;
+  onShare?: (photoId: string) => void;
+}
+
+function CustomSlide({ slide, onShare }: CustomSlideProps) {
   const [loaded, setLoaded] = useState(false);
 
   // ── Build EXIF line ─────────────────────────
@@ -90,7 +98,30 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
         sizes="(max-width: 768px) 100vw, 80vw"
       />
 
-      {/* ── EXIF overlay ──────────────────────── */}
+      {/* ── Top-right action buttons ───────────── */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-end gap-2 bg-gradient-to-b from-black/50 to-transparent px-3 py-2 sm:px-4 sm:py-3">
+            <a
+              href={`/api/photos/${slide.id}/download`}
+              download
+              className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white/80 backdrop-blur-sm transition-colors hover:bg-black/80 hover:text-white"
+              title="下载原图"
+            >
+              <Download className="h-4 w-4" />
+            </a>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onShare?.(slide.id);
+              }}
+              className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white/80 backdrop-blur-sm transition-colors hover:bg-black/80 hover:text-white"
+              title="生成分享图"
+            >
+              <Share2 className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* ── EXIF overlay ──────────────────────── */}
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/80 px-4 pt-10 text-center md:px-6"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
@@ -134,6 +165,7 @@ interface PhotoLightboxProps {
   index: number;
   onClose: () => void;
   onIndexChange: (index: number) => void;
+  onShare?: (photoId: string) => void;
 }
 
 export function PhotoLightbox({
@@ -142,6 +174,7 @@ export function PhotoLightbox({
   index,
   onClose,
   onIndexChange,
+  onShare,
 }: PhotoLightboxProps) {
   // Map photos to YARL-compatible slide data
   const slides = useMemo<ExifSlide[]>(
@@ -153,6 +186,8 @@ export function PhotoLightbox({
         blurDataUrl: p.blurDataUrl,
         title: p.title,
         description: p.description,
+        id: p.id,
+        slug: p.slug,
         make: p.make,
         model: p.model,
         lensModel: p.lensModel,
@@ -193,7 +228,7 @@ export function PhotoLightbox({
       }}
       render={{
         slide: ({ slide }) => (
-          <CustomSlide slide={slide as ExifSlide} />
+          <CustomSlide slide={slide as ExifSlide} onShare={onShare} />
         ),
         buttonZoom: () => null,
       }}

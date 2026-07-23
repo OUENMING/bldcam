@@ -8,6 +8,7 @@ import type { Photo } from "@prisma/client";
 import { useViewMode } from "@/context/view-mode";
 import { MemoizedPhotoCard } from "./photo-card";
 import { FeedGallery } from "./feed-gallery";
+import { ShareDialog } from "./share-dialog";
 
 const PhotoLightbox = dynamic(
   () => import("./photo-lightbox").then((m) => ({ default: m.PhotoLightbox })),
@@ -42,6 +43,10 @@ export function PhotoGrid({
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
 
+  // ── Share dialog state ─────────────────────────
+  const [sharePhotoId, setSharePhotoId] = useState<string | null>(null);
+  const [sharePhotoTitle, setSharePhotoTitle] = useState("");
+
   // Update URL bar when lightbox opens (no page navigation)
   useEffect(() => {
     if (open && photos[index]?.slug) {
@@ -53,6 +58,15 @@ export function PhotoGrid({
 
   const hasMore = cursor !== null;
   const loadedCount = photos.length;
+
+  const handleShare = useCallback((photoId: string) => {
+    setOpen(false); // Close lightbox before opening share dialog (z-index conflict)
+    const p = photos.find((ph) => ph.id === photoId);
+    if (p) {
+      setSharePhotoId(photoId);
+      setSharePhotoTitle(p.title);
+    }
+  }, [photos]);
 
   // ── Fetch next page ───────────────────────────
 
@@ -161,7 +175,20 @@ export function PhotoGrid({
           window.history.replaceState(null, "", "/");
         }}
         onIndexChange={setIndex}
+        onShare={handleShare}
       />
+
+      {/* ── Share dialog ────────────────────────── */}
+      {sharePhotoId && (
+        <ShareDialog
+          photoId={sharePhotoId}
+          photoTitle={sharePhotoTitle}
+          open={sharePhotoId !== null}
+          onOpenChange={(val) => {
+            if (!val) setSharePhotoId(null);
+          }}
+        />
+      )}
     </>
   );
 }
