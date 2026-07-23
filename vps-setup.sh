@@ -26,7 +26,14 @@ if [ -n "$SHARP_CACHE" ] && [ -d node_modules/sharp ]; then
   done
 fi
 
-# ── 5. Start PM2 ────────────────────────────────
+# ── 5. Fix Prisma symlink (macOS→Linux compat) ──
+PRISMA_LINK=$(find .next/node_modules/@prisma -maxdepth 1 -type l -name 'client-*' 2>/dev/null | head -1)
+if [ -n "$PRISMA_LINK" ]; then
+  rm -f "$PRISMA_LINK"
+  cp -r node_modules/@prisma/client "${PRISMA_LINK}" 2>/dev/null || true
+fi
+
+# ── 6. Start PM2 ────────────────────────────────
 #     restart preserves uptime; start used on first run
 pm2 restart bldcam 2>/dev/null || pm2 start server.js --name bldcam
 pm2 save 2>/dev/null
