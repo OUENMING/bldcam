@@ -63,12 +63,24 @@ export const CLASSIC_THEME = {
     alpha: 0.06,
   },
 
-  // ── Double shadow (Apple / Leica floating card style) ──
+  // ── Optical shadow (3-layer light-from-above model) ──
+  //
+  //   Light source: overhead. Shadow extends downward.
+  //   Each layer has a distinct role, mimicking real-world light propagation.
+  //
+  //   Contact  — tightest, densest, closest to the photo.
+  //              Establishes the photo has physical thickness.
+  //   Ambient  — main directional spread, medium opacity.
+  //              Creates the "floating card above surface" illusion.
+  //   Falloff  — widest, very faint. No visible boundary.
+  //              Fades so gradually the viewer only senses it melting out.
   shadow: {
-    /** Tighter, darker shadow — gives "just lifted off surface" feel */
-    shadow1: { blur: 18, opacity: 0.18, offsetY: 8 },
-    /** Softer, wider shadow — gives ambient depth */
-    shadow2: { blur: 42, opacity: 0.10, offsetY: 18 },
+    /** Tight shadow — photo thickness */
+    contact:  { blur: 6,  opacity: 0.20, offsetY: 4 },
+    /** Main floating depth — directional, extends downward */
+    ambient:  { blur: 28, opacity: 0.11, offsetY: 14 },
+    /** Gradual fade — melts into background, no visible end */
+    falloff:  { blur: 68, opacity: 0.05, offsetY: 30 },
   },
 
   // ── Typography ───────────────────────────────────
@@ -80,11 +92,13 @@ export const CLASSIC_THEME = {
     /** Horizontal gap between brand name and first parameter (SVG dx) */
     paramGap: 18,
     /** Font stack — Helvetica Neue preferred, graceful fallback to Arial */
-    fontFamily: `"Helvetica Neue","Arial","Helvetica",sans-serif`,
+    fontFamily: `'Helvetica Neue',Arial,Helvetica,sans-serif`,
     /** Brand name: italic 900 for bold photographic identity */
     brandWeight: 900,
     /** EXIF params: regular 400 for clean data presentation */
     paramWeight: 400,
+    /** EXIF params opacity — slightly less than the pure-white brand name */
+    paramOpacity: 0.82,
   },
 
   // ── Output ───────────────────────────────────────
@@ -174,7 +188,7 @@ function computeLayout(photoW: number, photoH: number, theme: ShareTheme): Layou
     padX: padding,
     padTop: padding,
     textBarH,
-    textCenterY: padding + cardH + Math.round(textBarH / 2),
+    textCenterY: padding + cardH + Math.round(textBarH * 0.55),
     radius,
   };
 }
@@ -296,15 +310,14 @@ function buildExifTextSvg(
   // Parameter spans — each gets dx="${paramGap}" so a missing field doesn't collapse spacing
   const paramSpans = segs.map((s, i) => {
     const dx = i === 0 ? ty.paramGap : ty.paramGap;
-    return `<tspan dx="${dx}" font-weight="${ty.paramWeight}" font-size="${ty.paramSize}" fill-opacity="0.9">${esc(s.text)}</tspan>`;
+    return `<tspan dx="${dx}" font-weight="${ty.paramWeight}" font-size="${ty.paramSize}" opacity="${ty.paramOpacity}">${esc(s.text)}</tspan>`;
   }).join("");
 
   return `<svg width="${canvasW}" height="${textBarH}" xmlns="http://www.w3.org/2000/svg">
     <text x="${cx}" y="${y}"
           font-family="${ty.fontFamily}"
           fill="#ffffff"
-          text-anchor="middle"
-          dominant-baseline="central">
+          text-anchor="middle">
       ${brandSpan}${paramSpans}
     </text>
   </svg>`;
@@ -356,27 +369,39 @@ async function renderOverlay(
 }
 
 // ── Shadow Renderer ───────────────────────────────
-//   Returns two buffers: tight shadow + ambient shadow.
+//   Three-layer optical shadow: contact → ambient → falloff.
+//   Each layer has increasing blur and decreasing opacity,
+//   mimicking real-world light propagation from an overhead source.
+
+interface ShadowBuffers {
+  contact: Buffer;
+  ambient: Buffer;
+  falloff: Buffer;
+}
 
 async function renderShadows(
   layout: Layout,
   theme: ShareTheme,
-): Promise<{ shadow1: Buffer; shadow2: Buffer }> {
+): Promise<ShadowBuffers> {
   const { cardW, cardH, radius } = layout;
-  const { shadow1: s1, shadow2: s2 } = theme.shadow;
+  const { contact, ambient, falloff } = theme.shadow;
 
-  const [buf1, buf2] = await Promise.all([
-    sharp(Buffer.from(buildShadowSvg(cardW, cardH, radius, s1.opacity)))
-      .blur(s1.blur)
+  const [buf1, buf2, buf3] = await Promise.all([
+    sharp(Buffer.from(buildShadowSvg(cardW, cardH, radius, contact.opacity)))
+      .blur(contact.blur)
       .png()
       .toBuffer(),
-    sharp(Buffer.from(buildShadowSvg(cardW, cardH, radius, s2.opacity)))
-      .blur(s2.blur)
+    sharp(Buffer.from(buildShadowSvg(cardW, cardH, radius, ambient.opacity)))
+      .blur(ambient.blur)
+      .png()
+      .toBuffer(),
+    sharp(Buffer.from(buildShadowSvg(cardW, cardH, radius, falloff.opacity)))
+      .blur(falloff.blur)
       .png()
       .toBuffer(),
   ]);
 
-  return { shadow1: buf1, shadow2: buf2 };
+  return { contact: buf1, ambient: buf2, falloff: buf3 };
 }
 
 // ── Photo Renderer ────────────────────────────────
@@ -416,14 +441,14 @@ async function renderTypography(
 async function renderComposite(
   background: Buffer,
   overlay: Buffer | null,
-  shadows: { shadow1: Buffer; shadow2: Buffer },
+  shadows: ShadowBuffers,
   photoCard: Buffer,
   typography: Buffer,
   layout: Layout,
   theme: ShareTheme,
 ): Promise<Buffer> {
   const { padX, padTop, cardH } = layout;
-  const { shadow1: s1, shadow2: s2 } = theme.shadow;
+  const { contact, ambient, falloff } = theme.shadow;
 
   const layers: sharp.OverlayOptions[] = [];
 
@@ -432,9 +457,11 @@ async function renderComposite(
     layers.push({ input: overlay, top: 0, left: 0 });
   }
 
-  // Double shadow (rendered behind the photo card)
-  layers.push({ input: shadows.shadow1, top: padTop + s1.offsetY, left: padX });
-  layers.push({ input: shadows.shadow2, top: padTop + s2.offsetY, left: padX });
+  // Three-layer optical shadow — bottom to top: falloff → ambient → contact
+  // Each with progressively larger Y offset (light from above)
+  layers.push({ input: shadows.falloff, top: padTop + falloff.offsetY, left: padX });
+  layers.push({ input: shadows.ambient, top: padTop + ambient.offsetY, left: padX });
+  layers.push({ input: shadows.contact, top: padTop + contact.offsetY, left: padX });
 
   // Photo card
   layers.push({ input: photoCard, top: padTop, left: padX });
