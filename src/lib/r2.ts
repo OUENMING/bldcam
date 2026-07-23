@@ -93,6 +93,10 @@ export function getShareKey(photoId: string): string {
   return `share/${photoId}/classic.png`;
 }
 
+export function getShareKeyV2(photoId: string): string {
+  return `share/${photoId}/classic-v2.png`;
+}
+
 export function getShareUrl(photoId: string): string {
   return `${R2_PUBLIC_URL}/${getShareKey(photoId)}`;
 }

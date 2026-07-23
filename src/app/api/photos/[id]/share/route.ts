@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateShareImage } from "@/lib/share";
-import { uploadToR2, getShareKey, getShareUrl } from "@/lib/r2";
+import { uploadToR2, getShareKeyV2, getShareUrl } from "@/lib/r2";
 
 // ═══════════════════════════════════════════════════════
 // GET /api/photos/[id]/share
@@ -55,7 +55,7 @@ export async function GET(
     const pngBuf = await generateShareImage(photo, srcBuf);
 
     // ── Upload to R2 cache (async, don't block response) ──
-    const shareKey = getShareKey(id);
+    const shareKey = getShareKeyV2(id);
     uploadToR2(shareKey, pngBuf, "image/png").catch((e) =>
       console.warn("Share: R2 cache upload failed:", e),
     );

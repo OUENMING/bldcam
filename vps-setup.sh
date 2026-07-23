@@ -5,7 +5,11 @@ set -e
 
 cd /home/bldcam
 
-# ── 1. Fix DATABASE_URL to absolute path ──────────
+# ── 1. Install system fonts for share card rendering ──
+sudo apt-get update -qq
+sudo apt-get install -y -qq fonts-inter 2>/dev/null || true
+
+# ── 2. Fix DATABASE_URL to absolute path ──────────
 sed -i "s|^DATABASE_URL=.*|DATABASE_URL=file:/home/bldcam/dev.db|" .env.production
 
 # ── 2. Reinstall sharp for Linux ──────────────────

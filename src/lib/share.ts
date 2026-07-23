@@ -1,236 +1,311 @@
 import sharp from "sharp";
 import type { Photo } from "@prisma/client";
 
-// ── Types ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// Theme — all visual parameters in one place
+// ═══════════════════════════════════════════════════════
 
-interface ShareLayout {
+interface ShareTheme {
+  canvas: { width: number; padding: number; radius: number; textBarH: number };
+  background: { blur: number; scale: number; brightness: number; saturation: number; overlayRgb: string; overlayAlpha: number };
+  shadow: { blur1: number; opacity1: number; offsetY1: number; blur2: number; opacity2: number; offsetY2: number };
+  typography: { brandSize: number; paramSize: number; paramGap: number; fontFamily: string; brandWeight: number; paramWeight: number };
+  vignette: { opacity: number; innerStop: number };
+}
+
+const CLASSIC: ShareTheme = {
+  canvas: { width: 1440, padding: 90, radius: 24, textBarH: 96 },
+  background: { blur: 52, scale: 1.08, brightness: 0.88, saturation: 0.90, overlayRgb: "8,10,8", overlayAlpha: 0.12 },
+  shadow: { blur1: 18, opacity1: 0.18, offsetY1: 8, blur2: 42, opacity2: 0.10, offsetY2: 18 },
+  typography: { brandSize: 58, paramSize: 26, paramGap: 16, fontFamily: `"Helvetica Neue","Arial","Helvetica",sans-serif`, brandWeight: 900, paramWeight: 400 },
+  vignette: { opacity: 0.10, innerStop: 60 },
+};
+
+// ═══════════════════════════════════════════════════════
+// Brand display-name map — keep original casing
+// ═══════════════════════════════════════════════════════
+
+const BRAND_DISPLAY: Record<string, string> = {
+  NIKON: "Nikon",
+  "NIKON CORPORATION": "Nikon",
+  NIKONCORPORATION: "Nikon",
+  SONY: "Sony",
+  CANON: "Canon",
+  FUJIFILM: "FUJIFILM",
+  LEICA: "Leica",
+  "LEICA CAMERA AG": "Leica",
+  Panasonic: "Panasonic",
+  OLYMPUS: "Olympus",
+  "OLYMPUS CORPORATION": "Olympus",
+  PENTAX: "Pentax",
+  RICOH: "Ricoh",
+  HASSELBLAD: "Hasselblad",
+  Apple: "Apple",
+  SAMSUNG: "Samsung",
+  Google: "Google",
+  DJI: "DJI",
+  GoPro: "GoPro",
+};
+
+function brandDisplayName(make: string | null): string | null {
+  if (!make) return null;
+  const trimmed = make.trim();
+  return BRAND_DISPLAY[trimmed] ?? trimmed;
+}
+
+// ═══════════════════════════════════════════════════════
+// EXIF formatting
+// ═══════════════════════════════════════════════════════
+
+function formatFocalLength(value: number | null | undefined): string | null {
+  if (value == null) return null;
+  return `${Math.round(value)}mm`;
+}
+
+function formatFNumber(value: number | null | undefined): string | null {
+  if (value == null) return null;
+  return `F${value}`;
+}
+
+function formatExposure(seconds: number | null | undefined): string | null {
+  if (!seconds || seconds <= 0) return null;
+  if (seconds < 1) return `1/${Math.round(1 / seconds)}s`;
+  if (seconds === 1) return "1s";
+  return `${seconds}s`;
+}
+
+function formatIso(value: number | null | undefined): string | null {
+  if (value == null) return null;
+  return `ISO${value}`;
+}
+
+interface ExifSegment {
+  text: string;
+}
+
+function buildExifSegments(photo: Photo): ExifSegment[] {
+  const segs: ExifSegment[] = [];
+  const fl = photo.focalLength35mm ?? photo.focalLength;
+  const flText = formatFocalLength(fl);
+  if (flText) segs.push({ text: flText });
+  const fnText = formatFNumber(photo.fNumber);
+  if (fnText) segs.push({ text: fnText });
+  const etText = formatExposure(photo.exposureTime);
+  if (etText) segs.push({ text: etText });
+  const isoText = formatIso(photo.iso);
+  if (isoText) segs.push({ text: isoText });
+  return segs;
+}
+
+// ═══════════════════════════════════════════════════════
+// XML escape
+// ═══════════════════════════════════════════════════════
+
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ═══════════════════════════════════════════════════════
+// Layout
+// ═══════════════════════════════════════════════════════
+
+interface Layout {
   canvasW: number;
   canvasH: number;
   cardW: number;
   cardH: number;
-  photoH: number;
-  barH: number;
-  padding: number;
+  padX: number;
+  padTop: number;
+  textBarH: number;
+  textCenterY: number;
   radius: number;
-  fontSize: { brand: number; params: number; meta: number };
 }
 
-// ── Layout computation ─────────────────────────────
-
-function computeLayout(photoW: number, photoH: number): ShareLayout {
-  const baseW = 1440;
-  const padding = Math.round(baseW * 0.07);
-  const cardW = baseW - 2 * padding;
+function computeLayout(photoW: number, photoH: number): Layout {
+  const t = CLASSIC;
   const aspect = photoW / photoH;
-  const photoCardH = Math.round(cardW / aspect);
-  const barH = Math.max(100, Math.min(180, Math.round(photoCardH * 0.12)));
-  const cardH = photoCardH + barH;
-  const canvasH = cardH + 2 * padding;
+  const cardW = t.canvas.width - 2 * t.canvas.padding;           // 1260
+  const cardH = Math.round(cardW / aspect);                       // keeps original ratio — no crop
+  const canvasH = t.canvas.padding + cardH + t.canvas.textBarH + t.canvas.padding;
 
   return {
-    canvasW: baseW,
+    canvasW: t.canvas.width,
     canvasH,
     cardW,
     cardH,
-    photoH: photoCardH,
-    barH,
-    padding,
-    radius: 28,
-    fontSize: {
-      brand: Math.max(20, Math.min(36, Math.round(barH * 0.35))),
-      params: Math.max(16, Math.min(30, Math.round(barH * 0.28))),
-      meta: Math.max(12, Math.min(22, Math.round(barH * 0.2))),
-    },
+    padX: t.canvas.padding,
+    padTop: t.canvas.padding,
+    textBarH: t.canvas.textBarH,
+    textCenterY: t.canvas.padding + cardH + Math.round(t.canvas.textBarH / 2),
+    radius: t.canvas.radius,
   };
 }
 
-// ── EXIF helpers ───────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// SVG builders
+// ═══════════════════════════════════════════════════════
 
-function formatExp(seconds: number | null | undefined): string {
-  if (!seconds || seconds <= 0) return "";
-  if (seconds < 1) {
-    const d = Math.round(1 / seconds);
-    return `1/${d}s`;
-  }
-  return seconds === 1 ? "1s" : `${seconds}s`;
+/** Photo card with rounded corners (clipPath) — displayed at exact cardW × cardH */
+function photoCardSvg(imageBase64: string, cardW: number, cardH: number, radius: number): string {
+  return `<svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <clipPath id="rc">
+        <rect width="${cardW}" height="${cardH}" rx="${radius}" ry="${radius}"/>
+      </clipPath>
+    </defs>
+    <image href="data:image/webp;base64,${imageBase64}"
+           width="${cardW}" height="${cardH}"
+           preserveAspectRatio="xMidYMid meet"
+           clip-path="url(#rc)"/>
+  </svg>`;
 }
 
-function buildExifParamString(photo: Photo): string {
-  const parts: string[] = [];
-  const fl = photo.focalLength35mm ?? photo.focalLength;
-  if (fl) parts.push(`${Math.round(fl)}mm`);
-  if (photo.fNumber) parts.push(`F${photo.fNumber}`);
-  const et = formatExp(photo.exposureTime);
-  if (et) parts.push(et);
-  if (photo.iso) parts.push(`ISO${photo.iso}`);
-  return parts.join("  ");
+/** Shadow: a dark rounded rect, rendered as separate layer. */
+function shadowSvg(w: number, h: number, radius: number, opacity: number): string {
+  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="${w}" height="${h}" rx="${radius}" ry="${radius}" fill="rgba(0,0,0,${opacity})"/>
+  </svg>`;
 }
 
-function fmtDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}.${m}.${day}`;
+/** Background overlay — very light tint to unify the blurred bg. */
+function overlaySvg(w: number, h: number, rgb: string, alpha: number): string {
+  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="${w}" height="${h}" fill="rgba(${rgb},${alpha})"/>
+  </svg>`;
 }
 
-function fmtLoc(photo: Photo): string {
-  return [photo.city, photo.region, photo.country].filter(Boolean).join(" · ");
-}
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-// ── SVG builders ───────────────────────────────────
-
-function vignetteSvg(w: number, h: number): string {
+/** Subtle vignette for photo card — dark-green radial gradient. */
+function vignetteSvg(w: number, h: number, innerStop: number, opacity: number): string {
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <radialGradient id="v" cx="50%" cy="50%" r="70%">
-        <stop offset="65%" stop-color="#000" stop-opacity="0"/>
-        <stop offset="100%" stop-color="#000" stop-opacity="0.35"/>
+      <radialGradient id="vig" cx="50%" cy="50%" r="75%">
+        <stop offset="${innerStop}%" stop-color="#0a0f08" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#0a0f08" stop-opacity="${opacity}"/>
       </radialGradient>
     </defs>
-    <rect width="${w}" height="${h}" fill="url(#v)"/>
+    <rect width="${w}" height="${h}" fill="url(#vig)"/>
   </svg>`;
 }
 
-function exifBarSvg(
-  w: number,
-  h: number,
-  photo: Photo,
-  fs: { brand: number; params: number; meta: number },
-): string {
-  const make = photo.make || "";
-  const params = buildExifParamString(photo);
-  const hasContent = make || params;
-  const brand = hasContent ? make : "BLDcam";
-  const pStr = hasContent ? `  ${params}` : "";
+/** EXIF text bar — transparent background, centred brand + per-field param spans. */
+function exifTextSvg(canvasW: number, textBarH: number, textCenterY: number, photo: Photo): string {
+  const t = CLASSIC.typography;
+  const brand = brandDisplayName(photo.make);
+  const segs = buildExifSegments(photo);
+  const hasContent = brand || segs.length > 0;
 
-  const rightSegs: string[] = [];
-  if (photo.dateTimeOriginal)
-    rightSegs.push(fmtDate(new Date(photo.dateTimeOriginal)));
-  const loc = fmtLoc(photo);
-  if (loc) rightSegs.push(loc);
-  const right = rightSegs.join(" · ");
+  const displayBrand = hasContent ? (brand ?? "BLDcam") : "BLDcam";
+  const cx = Math.round(canvasW / 2);
+  const y = Math.round(textBarH / 2); // relative to the text bar SVG
 
-  const cy = Math.round(h / 2);
-  const px = Math.max(24, Math.min(40, Math.round(w * 0.03)));
-  const ff = "Arial,Helvetica,'Noto Sans SC',sans-serif";
+  // Build centred group: brand on the left, params after a gap
+  let textElem = "";
+  if (segs.length > 0) {
+    const segSpans = segs.map((s, i) => {
+      const dx = i === 0 ? t.paramGap : t.paramGap;
+      return `<tspan dx="${dx}" font-weight="${t.paramWeight}" font-size="${t.paramSize}" fill-opacity="0.9">${esc(s.text)}</tspan>`;
+    }).join("");
+    textElem =
+      `<tspan font-style="italic" font-weight="${t.brandWeight}" font-size="${t.brandSize}">${esc(displayBrand)}</tspan>${segSpans}`;
+  } else {
+    textElem =
+      `<tspan font-style="italic" font-weight="${t.brandWeight}" font-size="${t.brandSize}">${esc(displayBrand)}</tspan>`;
+  }
 
-  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-    <rect width="${w}" height="${h}" fill="#080808"/>
-    <text x="${px}" y="${cy}" font-family="${ff}" fill="#fff" dominant-baseline="central">
-      <tspan font-style="italic" font-weight="800" font-size="${fs.brand}">${esc(brand)}</tspan>
-      <tspan font-weight="400" font-size="${fs.params}">${esc(pStr)}</tspan>
+  return `<svg width="${canvasW}" height="${textBarH}" xmlns="http://www.w3.org/2000/svg">
+    <text x="${cx}" y="${y}" font-family="${t.fontFamily}" fill="#ffffff"
+          text-anchor="middle" dominant-baseline="central">
+      ${textElem}
     </text>
-    ${right ? `<text x="${w - px}" y="${cy}" font-family="${ff}"
-      font-size="${fs.meta}" fill="#fff" fill-opacity="0.6"
-      text-anchor="end" dominant-baseline="central">${esc(right)}</text>` : ""}
   </svg>`;
 }
 
-// ── Main ───────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// Main pipeline
+// ═══════════════════════════════════════════════════════
 
 /**
- * Generate a share card image from a photo.
- * Returns a PNG Buffer ready for upload or direct response.
+ * Generate a share card image.
  *
- * Layer stack (bottom to top):
- *   1. Blurred + darkened background (full canvas)
- *   2. Card content (photo + vignette + EXIF bar, masked to rounded rect)
+ * Layer stack (bottom → top):
+ *  1. Blurred + modulated background (scale 108%, blur 52, brightness 0.88)
+ *  2. Tint overlay (rgba(8,10,8, 0.12))
+ *  3. Shadow 1 (opacity 0.18, blur 18, offsetY 8)
+ *  4. Shadow 2 (opacity 0.10, blur 42, offsetY 18)
+ *  5. Photo card (rounded corners, preserve aspect ratio)
+ *  6. Vignette (dark-green radial, opacity 0.10)
+ *  7. EXIF text (transparent background, centred)
  */
 export async function generateShareImage(
   photo: Photo,
   imageBuffer: Buffer,
 ): Promise<Buffer> {
+  const t = CLASSIC;
   const meta = await sharp(imageBuffer).metadata();
   const photoW = meta.width ?? 1200;
   const photoH = meta.height ?? 800;
   const layout = computeLayout(photoW, photoH);
-  const outerPx = Math.round((layout.canvasW - layout.cardW) / 2);
-  const outerPy = Math.round((layout.canvasH - layout.cardH) / 2);
 
-  // 1. Blurred background — fill whole canvas
+  // ── 1. Background ──────────────────────────────────
+  // Slightly scale up so blur doesn't show directional edges
+  const bgW = Math.round(layout.canvasW * t.background.scale);
+  const bgH = Math.round(layout.canvasH * t.background.scale);
+  const bgOffsetX = Math.round((bgW - layout.canvasW) / 2);
+  const bgOffsetY = Math.round((bgH - layout.canvasH) / 2);
+
   const bgBlur = await sharp(imageBuffer)
-    .resize(layout.canvasW, layout.canvasH, { fit: "fill" })
-    .blur(60)
-    .modulate({ brightness: 0.25 })
+    .resize(bgW, bgH, { fit: "cover", position: "centre" })
+    .extract({ left: bgOffsetX, top: bgOffsetY, width: layout.canvasW, height: layout.canvasH })
+    .blur(t.background.blur)
+    .modulate({ brightness: t.background.brightness, saturation: t.background.saturation })
     .png()
     .toBuffer();
 
-  // 2. Photo — resize to card width, preserve ratio
-  const photoBuf = await sharp(imageBuffer)
-    .resize(layout.cardW, layout.photoH, {
-      fit: "inside",
-      withoutEnlargement: true,
-    })
-    .png()
+  // ── 2. Background overlay ──────────────────────────
+  const overlayBuf = await sharp(
+    Buffer.from(overlaySvg(layout.canvasW, layout.canvasH, t.background.overlayRgb, t.background.overlayAlpha)),
+  ).png().toBuffer();
+
+  // ── 3 & 4. Double shadow ───────────────────────────
+  const s = t.shadow;
+  const shadow1Buf = await sharp(
+    Buffer.from(shadowSvg(layout.cardW, layout.cardH, layout.radius, s.opacity1)),
+  ).blur(s.blur1).png().toBuffer();
+
+  const shadow2Buf = await sharp(
+    Buffer.from(shadowSvg(layout.cardW, layout.cardH, layout.radius, s.opacity2)),
+  ).blur(s.blur2).png().toBuffer();
+
+  // ── 5. Photo card (resized + rounded corners) ──────
+  const photoResized = await sharp(imageBuffer)
+    .resize(layout.cardW, layout.cardH, { fit: "fill" })
+    .webp({ quality: 85 })
     .toBuffer();
+  const photoBase64 = photoResized.toString("base64");
+  const photoSvgStr = photoCardSvg(photoBase64, layout.cardW, layout.cardH, layout.radius);
+  const photoBuf = await sharp(Buffer.from(photoSvgStr)).png().toBuffer();
 
-  const pm = await sharp(photoBuf).metadata();
-  const aW = pm.width ?? layout.cardW;
-  const aH = pm.height ?? layout.photoH;
-  const pOffX = Math.round((layout.cardW - aW) / 2);
-  const pOffY = Math.round((layout.photoH - aH) / 2);
-
-  // 3. Vignette overlay — radial gradient
+  // ── 6. Vignette overlay ────────────────────────────
   const vigBuf = await sharp(
-    Buffer.from(vignetteSvg(layout.cardW, layout.photoH)),
-  )
-    .png()
-    .toBuffer();
+    Buffer.from(vignetteSvg(layout.cardW, layout.cardH, t.vignette.innerStop, t.vignette.opacity)),
+  ).png().toBuffer();
 
-  // 4. EXIF bar — SVG with text
-  const exifBuf = await sharp(
-    Buffer.from(exifBarSvg(layout.cardW, layout.barH, photo, layout.fontSize)),
-  )
-    .png()
-    .toBuffer();
+  // ── 7. EXIF text ───────────────────────────────────
+  const textSvgStr = exifTextSvg(layout.canvasW, layout.textBarH, layout.textCenterY, photo);
+  const textBuf = await sharp(Buffer.from(textSvgStr)).png().toBuffer();
 
-  // 5. Compose card content
-  const cardContent = await sharp({
-    create: {
-      width: layout.cardW,
-      height: layout.cardH,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    },
-  })
+  // ── Final composite ────────────────────────────────
+  const final = await sharp(bgBlur)
     .composite([
-      { input: photoBuf, top: pOffY, left: pOffX },
-      { input: vigBuf, top: 0, left: 0 },
-      { input: exifBuf, top: layout.photoH, left: 0 },
+      { input: overlayBuf, top: 0, left: 0 },
+      { input: shadow1Buf, top: layout.padTop + s.offsetY1, left: layout.padX },
+      { input: shadow2Buf, top: layout.padTop + s.offsetY2, left: layout.padX },
+      { input: photoBuf, top: layout.padTop, left: layout.padX },
+      { input: vigBuf, top: layout.padTop, left: layout.padX },
+      { input: textBuf, top: layout.padTop + layout.cardH, left: 0 },
     ])
-    .png()
+    .png({ quality: 92 })
     .toBuffer();
 
-  // 6. Rounded-corner mask
-  const maskSvg = `<svg width="${layout.cardW}" height="${layout.cardH}" xmlns="http://www.w3.org/2000/svg">
-    <rect width="${layout.cardW}" height="${layout.cardH}" rx="${layout.radius}" fill="white"/>
-  </svg>`;
-
-  const maskedCard = await sharp(cardContent)
-    .composite([
-      {
-        input: Buffer.from(maskSvg),
-        top: 0,
-        left: 0,
-        blend: "dest-in",
-      },
-    ])
-    .png()
-    .toBuffer();
-
-  // 7. Final composite: background + card
-  const result = await sharp(bgBlur)
-    .composite([{ input: maskedCard, top: outerPy, left: outerPx }])
-    .png({ quality: 90 })
-    .toBuffer();
-
-  return result;
+  return final;
 }
