@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, Download, Share2, AlertCircle } from "lucide-react";
 
-// ── Types ──────────────────────────────────────────
+// ── States ──────────────────────────────────────────
+
+type Status = "loading" | "ready" | "error";
+type Template = "classic" | "signature";
 
 interface ShareDialogProps {
   photoId: string;
@@ -20,8 +24,6 @@ interface ShareDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-type Status = "loading" | "ready" | "error";
 
 // ── Component ──────────────────────────────────────
 
@@ -33,21 +35,26 @@ export function ShareDialog({
 }: ShareDialogProps) {
   const [status, setStatus] = useState<Status>("loading");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [template, setTemplate] = useState<Template>("classic");
+  const [fadeIn, setFadeIn] = useState(false);
 
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
       setStatus("loading");
       setShareUrl(null);
-      fetchShareImage();
+      setTemplate("classic");
+      fetchShareImage("classic");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, photoId]);
 
-  async function fetchShareImage() {
+  async function fetchShareImage(tpl?: Template) {
+    const t = tpl ?? template;
     setStatus("loading");
+    setFadeIn(false);
     try {
-      const res = await fetch(`/api/photos/${photoId}/share`);
+      const res = await fetch(`/api/photos/${photoId}/share?template=${t}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const blob = await res.blob();
@@ -56,6 +63,8 @@ export function ShareDialog({
       const url = URL.createObjectURL(blob);
       setShareUrl(url);
       setStatus("ready");
+      // Trigger fade-in after render
+      requestAnimationFrame(() => setFadeIn(true));
     } catch (err) {
       console.error("ShareDialog: fetch failed", err);
       setStatus("error");
@@ -76,13 +85,13 @@ export function ShareDialog({
   const handleCopyLink = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(
-        `${window.location.origin}/api/photos/${photoId}/share`,
+        `${window.location.origin}/api/photos/${photoId}/share?template=${template}`,
       );
       toast.success("链接已复制");
     } catch {
       toast.error("复制失败");
     }
-  }, [photoId]);
+  }, [photoId, template]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,6 +102,47 @@ export function ShareDialog({
             <span className="truncate">{photoTitle}</span>
           </DialogTitle>
         </DialogHeader>
+
+        {/* ── Template Toggle ──────────────────────────── */}
+        <div className="flex justify-center">
+          <div
+            className={cn(
+              "inline-flex rounded-lg bg-muted p-0.5",
+              status === "loading" && "pointer-events-none opacity-50",
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setTemplate("classic");
+                fetchShareImage("classic");
+              }}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+                template === "classic"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              经典 EXIF
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTemplate("signature");
+                fetchShareImage("signature");
+              }}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+                template === "signature"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              艺术签名
+            </button>
+          </div>
+        </div>
 
         {/* ── Content ───────────────────────────── */}
         <div className="flex flex-col items-center gap-4">
@@ -109,7 +159,7 @@ export function ShareDialog({
             <div className="flex min-h-[300px] w-full flex-col items-center justify-center rounded-xl bg-muted/50">
               <AlertCircle className="mb-2 h-8 w-8 text-destructive" />
               <p className="mb-1 text-sm text-muted-foreground">生成失败</p>
-              <Button variant="outline" size="sm" onClick={fetchShareImage}>
+              <Button variant="outline" size="sm" onClick={() => fetchShareImage(template)}>
                 重试
               </Button>
             </div>
@@ -122,7 +172,11 @@ export function ShareDialog({
                 alt={photoTitle}
                 width={1440}
                 height={0}
-                className="h-auto w-auto max-h-[82svh] max-w-full object-contain"
+                className={cn(
+                  "h-auto w-auto max-h-[82svh] max-w-full object-contain",
+                  "transition-opacity duration-300 ease-out",
+                  fadeIn ? "opacity-100" : "opacity-0",
+                )}
                 unoptimized
                 priority
               />

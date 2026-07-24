@@ -1,4 +1,6 @@
 import sharp from "sharp";
+import { readFile } from "fs/promises";
+import path from "path";
 import type { Photo } from "@prisma/client";
 
 // ═══════════════════════════════════════════════════════════
@@ -115,6 +117,23 @@ export const CLASSIC_THEME = {
 // ═══════════════════════════════════════════════════════════
 
 export type ShareTheme = typeof CLASSIC_THEME;
+
+// ═══════════════════════════════════════════════════════════
+// SIGNATURE — visual parameters for the signature template
+// ═══════════════════════════════════════════════════════════
+
+export const SIGNATURE = {
+  /** Signature height as fraction of textBarH */
+  heightRatio: 0.55,
+  /** SVG file path relative to process.cwd() */
+  svgPath: "public/signature.svg",
+  /** Dark colors for light backgrounds */
+  darkColors: { primary: "#1c1c1c", secondary: "#666666" },
+  /** Light colors for dark backgrounds */
+  lightColors: { primary: "#ffffff", secondary: "#999999" },
+  /** Brightness threshold 0-255 */
+  brightnessThreshold: 128,
+} as const;
 
 /** Layout computed from a specific photo's dimensions */
 interface Layout {
@@ -430,6 +449,83 @@ async function renderTypography(
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
+// ── Signature Renderer ────────────────────────────
+//   Reads the SVG file, adapts color based on background brightness,
+//   and renders centered in the footer bar area.
+
+async function isFooterAreaDark(background: Buffer, layout: Layout): Promise<boolean> {
+  const stats = await sharp(background)
+    .extract({
+      left: 0,
+      top: layout.canvasH - layout.textBarH,
+      width: layout.canvasW,
+      height: layout.textBarH,
+    })
+    .stats();
+  const r = stats.channels[0].mean;
+  const g = stats.channels[1].mean;
+  const b = stats.channels[2].mean;
+  return (r + g + b) / 3 < SIGNATURE.brightnessThreshold;
+}
+
+async function renderSignature(
+  layout: Layout,
+  isDarkBg: boolean,
+): Promise<Buffer> {
+  // 1. Read SVG file
+  let svgContent: string;
+  try {
+    svgContent = await readFile(
+      path.join(process.cwd(), SIGNATURE.svgPath),
+      "utf-8",
+    );
+  } catch {
+    throw new Error(
+      "Signature SVG not found — ensure public/signature.svg exists",
+    );
+  }
+
+  // 2. Adapt color to background brightness
+  if (!isDarkBg) {
+    const { primary, secondary } = SIGNATURE.darkColors;
+    svgContent = svgContent
+      .replace(/fill="#ffffff"/g, `fill="${primary}"`)
+      .replace(/fill="#999999"/g, `fill="${secondary}"`);
+  }
+
+  // 3. Parse viewBox for source dimensions
+  const vbMatch = svgContent.match(/viewBox="([^"]+)"/);
+  const [, vbStr] = vbMatch ?? ["", "0 0 1000 1200"];
+  const parts = vbStr.split(/\s+/).map(Number);
+  const [,, vbW, vbH] = parts.length === 4 ? parts : [0, 0, 1000, 1200];
+
+  // 4. Compute target size (constrain by height, preserve aspect ratio)
+  const targetH = Math.round(layout.textBarH * SIGNATURE.heightRatio);
+  const targetW = Math.round(targetH * (vbW / vbH));
+
+  // 5. Render SVG to PNG at target size
+  const signaturePng = await sharp(Buffer.from(svgContent))
+    .resize(targetW, targetH)
+    .png()
+    .toBuffer();
+
+  // 6. Create transparent container (canvasW × textBarH), center signature
+  const offX = Math.round((layout.canvasW - targetW) / 2);
+  const offY = Math.round((layout.textBarH - targetH) / 2);
+
+  return sharp({
+    create: {
+      width: layout.canvasW,
+      height: layout.textBarH,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: signaturePng, top: offY, left: offX }])
+    .png()
+    .toBuffer();
+}
+
 // ── Composite Renderer ────────────────────────────
 
 async function renderComposite(
@@ -474,38 +570,50 @@ export interface ShareResult {
  *
  * Pipeline:
  *   Layout Engine  → computes canvas & card dimensions
- *   Background     → blurred, desaturated from photo
+ *   Background     → blurred, desaturated from photo (rendered first — signature needs it)
  *   Overlay        → optional tonal unification (not a vignette)
  *   Shadow         → SVG feDropShadow (true Gaussian, baked into photo card)
  *   Photo          → resized + rounded corners, no crop
- *   Typography     → centred single-line EXIF text on transparent bg
+ *   Typography/Sig → centred single-line EXIF text OR signature SVG on transparent bg
  *   Composite      → assembles all layers bottom-to-top
  *
- * Pass a different `theme` to calibrate or create variants.
+ * Pass `template: "signature"` to render the signature mark instead of brand + EXIF.
  */
 export async function generateShareImage(
   photo: Photo,
   imageBuffer: Buffer,
   theme: ShareTheme = CLASSIC_THEME,
+  template: "classic" | "signature" = "classic",
 ): Promise<ShareResult> {
   // Step 0: measure photo → compute layout
   const meta = await sharp(imageBuffer).metadata();
   const layout = computeLayout(meta.width ?? 1200, meta.height ?? 800, theme);
 
-  // Step 1–4: run independent renderers in parallel
-  const [background, overlay, photoCard, typography] = await Promise.all([
-    renderBackground(imageBuffer, layout, theme),
+  // Step 1: background first — signature color depends on footer brightness
+  const background = await renderBackground(imageBuffer, layout, theme);
+
+  const isSignature = template === "signature";
+  let footerLayer: Buffer;
+
+  if (isSignature) {
+    const isDark = await isFooterAreaDark(background, layout);
+    footerLayer = await renderSignature(layout, isDark);
+  } else {
+    footerLayer = await renderTypography(layout, photo, theme);
+  }
+
+  // Step 2: remaining layers in parallel
+  const [overlay, photoCard] = await Promise.all([
     renderOverlay(layout, theme),
     renderPhoto(imageBuffer, layout, theme),
-    renderTypography(layout, photo, theme),
   ]);
 
-  // Step 5: layer them back-to-front (shadow is baked into photoCard SVG)
+  // Step 3: composite bottom-to-top (shadow is baked into photoCard SVG)
   const buffer = await renderComposite(
     background,
     overlay,
     photoCard,
-    typography,
+    footerLayer,
     layout,
     theme,
   );

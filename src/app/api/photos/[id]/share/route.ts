@@ -7,7 +7,10 @@ import { uploadToR2, getShareKeyV2, getPublicUrl } from "@/lib/r2";
 // GET /api/photos/[id]/share
 //
 // Generates a share card for a photo. Results are cached in R2
-// at `share/{photoId}/classic.png` — subsequent requests redirect.
+// at `share/{photoId}/{template}-v12.png` — subsequent requests redirect.
+//
+// Query parameters:
+//   template   — "classic" (default, brand+EXIF) or "signature" (SVG mark)
 //
 // Accept header:
 //   image/*      → returns PNG directly (200)
@@ -21,13 +24,23 @@ export async function GET(
   try {
     const { id } = await params;
 
+    // ── Parse template parameter ────────────────────
+    const { searchParams } = new URL(request.url);
+    const template = searchParams.get("template") || "classic";
+    if (template !== "classic" && template !== "signature") {
+      return NextResponse.json(
+        { error: "Invalid template — must be 'classic' or 'signature'" },
+        { status: 400 },
+      );
+    }
+
     const photo = await prisma.photo.findUnique({ where: { id } });
     if (!photo) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // ── Check R2 cache (v2 key) ────────────────────
-    const shareKey = getShareKeyV2(id);
+    // ── Check R2 cache (template-aware) ────────────
+    const shareKey = getShareKeyV2(id, template);
     const shareUrl = getPublicUrl(shareKey);
     try {
       const head = await fetch(shareUrl, { method: "HEAD" });
@@ -53,7 +66,7 @@ export async function GET(
     const srcBuf = Buffer.from(await srcRes.arrayBuffer());
 
     // ── Generate share card ─────────────────────────
-    const { buffer: pngBuf } = await generateShareImage(photo, srcBuf);
+    const { buffer: pngBuf } = await generateShareImage(photo, srcBuf, undefined, template);
 
     // ── Upload to R2 cache (async, don't block response) ──
     uploadToR2(shareKey, pngBuf, "image/png").catch((e) =>
