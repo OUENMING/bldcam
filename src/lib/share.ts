@@ -63,24 +63,24 @@ export const CLASSIC_THEME = {
     alpha: 0.06,
   },
 
-  // ── Optical shadow (3-layer light-from-above model) ──
+  // ── Optical shadow (SVG feDropShadow — true Gaussian) ──
   //
-  //   Light source: overhead. Shadow extends downward.
-  //   Each layer has a distinct role, mimicking real-world light propagation.
+  //   Uses SVG feDropShadow filter which is a true Gaussian-based
+  //   drop shadow (same algorithm as Canvas 2D ctx.shadowBlur).
+  //   This produces a natural optical shadow that casts from the
+  //   photo's alpha channel, NOT a blurred black rectangle.
   //
-  //   Contact  — tightest, densest, closest to the photo.
-  //              Establishes the photo has physical thickness.
-  //   Ambient  — main directional spread, medium opacity.
-  //              Creates the "floating card above surface" illusion.
-  //   Falloff  — widest, very faint. No visible boundary.
-  //              Fades so gradually the viewer only senses it melting out.
+  //   Three chained feDropShadows in one filter:
+  //     Ring 1 → tightest core, establishes card thickness
+  //     Ring 2 → main ambient spread, creates elevation
+  //     Ring 3 → widest fade, melts into background
   shadow: {
-    /** Tight shadow — photo thickness */
-    contact:  { blur: 6,  opacity: 0.20, offsetY: 4 },
-    /** Main floating depth — directional, extends downward */
-    ambient:  { blur: 28, opacity: 0.11, offsetY: 14 },
-    /** Gradual fade — melts into background, no visible end */
-    falloff:  { blur: 68, opacity: 0.05, offsetY: 30 },
+    /** Core shadow — establishes photo has thickness */
+    ring1: { stdDev: 2, offsetY: 4, opacity: 0.25 },
+    /** Ambient — main floating depth, downward directional */
+    ring2: { stdDev: 8, offsetY: 14, opacity: 0.09 },
+    /** Dissolve — wide fade with no visible end */
+    ring3: { stdDev: 24, offsetY: 34, opacity: 0.035 },
   },
 
   // ── Typography ───────────────────────────────────
@@ -250,11 +250,16 @@ function esc(s: string): string {
 //   Each SVG builder returns a string. Sharp renders it to PNG.
 // ═══════════════════════════════════════════════════════════
 
-/** A rounded rect filled with black at a given opacity — used for shadow layers. */
-function buildShadowSvg(w: number, h: number, radius: number, opacity: number): string {
-  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-    <rect width="${w}" height="${h}" rx="${radius}" ry="${radius}" fill="rgba(0,0,0,${opacity})"/>
-  </svg>`;
+/** SVG feDropShadow filter — 3-ring Gaussian optical shadow.
+ *  Equivalent to LensBorder-Pro's Canvas ctx.shadowBlur approach.
+ *  All 3 rings are chained in one filter, casting from the photo's alpha channel. */
+function buildShadowFilter(theme: ShareTheme): string {
+  const { ring1, ring2, ring3 } = theme.shadow;
+  return `<filter id="sh" x="-40%" y="-40%" width="180%" height="180%">
+    <feDropShadow dx="0" dy="${ring1.offsetY}" stdDeviation="${ring1.stdDev}" flood-color="#000" flood-opacity="${ring1.opacity}"/>
+    <feDropShadow dx="0" dy="${ring2.offsetY}" stdDeviation="${ring2.stdDev}" flood-color="#000" flood-opacity="${ring2.opacity}"/>
+    <feDropShadow dx="0" dy="${ring3.offsetY}" stdDeviation="${ring3.stdDev}" flood-color="#000" flood-opacity="${ring3.opacity}"/>
+  </filter>`;
 }
 
 /** Full-canvas solid rect — tonal overlay to unify background brightness. */
@@ -348,75 +353,40 @@ async function renderOverlay(
   ).png().toBuffer();
 }
 
-// ── Shadow Renderer ───────────────────────────────
-//   Three-layer optical shadow: contact → ambient → falloff.
-//   Each layer has increasing blur and decreasing opacity,
-//   mimicking real-world light propagation from an overhead source.
-
-interface ShadowBuffers {
-  contact: Buffer;
-  ambient: Buffer;
-  falloff: Buffer;
-}
-
-async function renderShadows(
-  layout: Layout,
-  theme: ShareTheme,
-): Promise<ShadowBuffers> {
-  const { cardW, cardH, radius } = layout;
-  const { contact, ambient, falloff } = theme.shadow;
-
-  const [buf1, buf2, buf3] = await Promise.all([
-    sharp(Buffer.from(buildShadowSvg(cardW, cardH, radius, contact.opacity)))
-      .blur(contact.blur)
-      .png()
-      .toBuffer(),
-    sharp(Buffer.from(buildShadowSvg(cardW, cardH, radius, ambient.opacity)))
-      .blur(ambient.blur)
-      .png()
-      .toBuffer(),
-    sharp(Buffer.from(buildShadowSvg(cardW, cardH, radius, falloff.opacity)))
-      .blur(falloff.blur)
-      .png()
-      .toBuffer(),
-  ]);
-
-  return { contact: buf1, ambient: buf2, falloff: buf3 };
-}
-
-// ── Photo Renderer ────────────────────────────────
-//   Resizes photo to exact card dimensions (width fills, height from aspect),
-//   then clips to rounded rect via SVG clipPath.
+// ── Photo + Shadow Renderer ──────────────────────
+//   SVG feDropShadow filter casts a true Gaussian shadow directly
+//   from the photo's alpha channel. No separate shadow layers needed.
+//   This produces the same natural optical shadow as LensBorder-Pro
+//   and Canvas 2D ctx.shadowBlur — NOT a blurred black rectangle.
 
 async function renderPhoto(
   imageBuffer: Buffer,
   layout: Layout,
+  theme: ShareTheme,
 ): Promise<Buffer> {
   const { cardW, cardH, radius } = layout;
 
-  // Resize — use "inside" so aspect ratio is always preserved
-  // even if cardH is off by 1px from Math.round
+  // Resize — "inside" preserves aspect ratio
   const resized = await sharp(imageBuffer)
     .resize(cardW, cardH, { fit: "inside", withoutEnlargement: true })
     .png()
     .toBuffer();
 
-  // Get actual dimensions after inside-fit
   const meta = await sharp(resized).metadata();
   const aW = meta.width ?? cardW;
   const aH = meta.height ?? cardH;
-
-  // Create card canvas with rounded corners via SVG clipPath
-  // Photo sits inside at computed position (centred if portrait)
   const offX = Math.round((cardW - aW) / 2);
   const offY = Math.round((cardH - aH) / 2);
   const base64 = resized.toString("base64");
 
+  // SVG with rounded corners + 3-ring Gaussian drop shadow
+  const filter = buildShadowFilter(theme);
   const svg = `<svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <clipPath id="cr"><rect width="${cardW}" height="${cardH}" rx="${radius}" ry="${radius}"/></clipPath>
+      <clipPath id="cr"><rect width="${cardW}" height="${cardH}" rx="${radius}"/></clipPath>
+      ${filter}
     </defs>
-    <image href="data:image/png;base64,${base64}" x="${offX}" y="${offY}" width="${aW}" height="${aH}" clip-path="url(#cr)"/>
+    <image href="data:image/png;base64,${base64}" x="${offX}" y="${offY}" width="${aW}" height="${aH}" clip-path="url(#cr)" filter="url(#sh)"/>
   </svg>`;
 
   return sharp(Buffer.from(svg)).png().toBuffer();
@@ -438,29 +408,20 @@ async function renderTypography(
 async function renderComposite(
   background: Buffer,
   overlay: Buffer | null,
-  shadows: ShadowBuffers,
   photoCard: Buffer,
   typography: Buffer,
   layout: Layout,
   theme: ShareTheme,
 ): Promise<Buffer> {
   const { padX, padTop, cardH } = layout;
-  const { contact, ambient, falloff } = theme.shadow;
 
   const layers: sharp.OverlayOptions[] = [];
 
-  // Optional tonal overlay
   if (overlay) {
     layers.push({ input: overlay, top: 0, left: 0 });
   }
 
-  // Three-layer optical shadow — bottom to top: falloff → ambient → contact
-  // Each with progressively larger Y offset (light from above)
-  layers.push({ input: shadows.falloff, top: padTop + falloff.offsetY, left: padX });
-  layers.push({ input: shadows.ambient, top: padTop + ambient.offsetY, left: padX });
-  layers.push({ input: shadows.contact, top: padTop + contact.offsetY, left: padX });
-
-  // Photo card
+  // Photo card (shadow is baked into the SVG via feDropShadow filter)
   layers.push({ input: photoCard, top: padTop, left: padX });
 
   // EXIF text below the card
@@ -488,7 +449,7 @@ export interface ShareResult {
  *   Layout Engine  → computes canvas & card dimensions
  *   Background     → blurred, desaturated from photo
  *   Overlay        → optional tonal unification (not a vignette)
- *   Shadow         → 3-layer optical floating-card shadow
+ *   Shadow         → SVG feDropShadow (true Gaussian, baked into photo card)
  *   Photo          → resized + rounded corners, no crop
  *   Typography     → centred single-line EXIF text on transparent bg
  *   Composite      → assembles all layers bottom-to-top
@@ -504,20 +465,18 @@ export async function generateShareImage(
   const meta = await sharp(imageBuffer).metadata();
   const layout = computeLayout(meta.width ?? 1200, meta.height ?? 800, theme);
 
-  // Step 1–5: run independent renderers in parallel where possible
-  const [background, overlay, shadows, photoCard, typography] = await Promise.all([
+  // Step 1–4: run independent renderers in parallel
+  const [background, overlay, photoCard, typography] = await Promise.all([
     renderBackground(imageBuffer, layout, theme),
     renderOverlay(layout, theme),
-    renderShadows(layout, theme),
-    renderPhoto(imageBuffer, layout),
+    renderPhoto(imageBuffer, layout, theme),
     renderTypography(layout, photo, theme),
   ]);
 
-  // Step 6: layer them back-to-front
+  // Step 5: layer them back-to-front (shadow is baked into photoCard SVG)
   const buffer = await renderComposite(
     background,
     overlay,
-    shadows,
     photoCard,
     typography,
     layout,
