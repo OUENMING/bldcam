@@ -262,6 +262,22 @@ function buildShadowFilter(theme: ShareTheme): string {
   </filter>`;
 }
 
+/** Continuous corner path (squircle / superellipse).
+ *  Uses cubic bezier control points to approximate Apple-style
+ *  continuous curvature instead of traditional circular arcs. */
+function squirclePath(w: number, h: number, r: number): string {
+  const c = r * 0.45; // control point factor — 0.45 ≈ Apple squircle
+  return `M ${r} 0
+    C ${r + c} 0, ${w - c} 0, ${w - r} 0
+    C ${w} ${c * 0.55}, ${w} ${r + c}, ${w} ${r}
+    L ${w} ${h - r}
+    C ${w} ${h - c}, ${w - c} ${h}, ${w - r} ${h}
+    L ${r} ${h}
+    C ${c} ${h}, 0 ${h - c}, 0 ${h - r}
+    L 0 ${r}
+    C 0 ${c}, ${c} 0, ${r} 0 Z`;
+}
+
 /** Full-canvas solid rect — tonal overlay to unify background brightness. */
 function buildOverlaySvg(w: number, h: number, rgb: string, alpha: number): string {
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
@@ -379,11 +395,12 @@ async function renderPhoto(
   const offY = Math.round((cardH - aH) / 2);
   const base64 = resized.toString("base64");
 
-  // SVG with rounded corners + 3-ring Gaussian drop shadow
+  // SVG with continuous corners (squircle) + 3-ring Gaussian drop shadow
   const filter = buildShadowFilter(theme);
+  const clipPath = squirclePath(cardW, cardH, radius);
   const svg = `<svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <clipPath id="cr"><rect width="${cardW}" height="${cardH}" rx="${radius}"/></clipPath>
+      <clipPath id="cr"><path d="${clipPath}"/></clipPath>
       ${filter}
     </defs>
     <image href="data:image/png;base64,${base64}" x="${offX}" y="${offY}" width="${aW}" height="${aH}" clip-path="url(#cr)" filter="url(#sh)"/>
