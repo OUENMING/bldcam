@@ -384,8 +384,11 @@ async function renderPhoto(
 ): Promise<Buffer> {
   const { cardW, cardH, radius } = layout;
 
-  // Resize — "inside" preserves aspect ratio
-  const resized = await sharp(imageBuffer)
+  // 1. Fix EXIF orientation — rotate() applies Orientation tag
+  const oriented = await sharp(imageBuffer).rotate().toBuffer();
+
+  // 2. Resize — "inside" preserves aspect ratio
+  const resized = await sharp(oriented)
     .resize(cardW, cardH, { fit: "inside", withoutEnlargement: true })
     .png()
     .toBuffer();
@@ -397,15 +400,20 @@ async function renderPhoto(
   const offY = Math.round((cardH - aH) / 2);
   const base64 = resized.toString("base64");
 
-  // SVG with continuous corners (squircle) + 3-ring Gaussian drop shadow
+  // 3. Clip path = actual photo dimensions (not card dimensions).
+  //    Fixes: withoutEnlargement → photo smaller than card → old clip missed corners.
   const filter = buildShadowFilter(theme);
-  const clipPath = squirclePath(cardW, cardH, radius);
+  const clipPath = squirclePath(aW, aH, radius);
   const svg = `<svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <clipPath id="cr"><path d="${clipPath}"/></clipPath>
       ${filter}
     </defs>
-    <image href="data:image/png;base64,${base64}" x="${offX}" y="${offY}" width="${aW}" height="${aH}" clip-path="url(#cr)" filter="url(#sh)"/>
+    <g transform="translate(${offX}, ${offY})">
+      <image href="data:image/png;base64,${base64}"
+             x="0" y="0" width="${aW}" height="${aH}"
+             clip-path="url(#cr)" filter="url(#sh)"/>
+    </g>
   </svg>`;
 
   return sharp(Buffer.from(svg)).png().toBuffer();
