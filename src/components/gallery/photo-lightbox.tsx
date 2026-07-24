@@ -77,23 +77,26 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
   const location = formatLocation(slide);
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center">
-      <Image
-        src={slide.src}
-        alt={slide.title}
-        width={slide.width}
-        height={slide.height}
-        placeholder={slide.blurDataUrl ? "blur" : "empty"}
-        blurDataURL={slide.blurDataUrl ?? undefined}
-        priority
-        onLoad={() => setLoaded(true)}
-        className={cn(
-          "max-h-[90svh] w-auto max-w-full object-contain",
-          "transition-opacity duration-700 ease-out",
-          loaded ? "opacity-100" : "opacity-0",
-        )}
-        sizes="90vw"
-      />
+    <div className="relative flex h-full w-full items-center justify-center p-4">
+      <div className="relative max-h-[92svh] max-w-[92vw]">
+        <Image
+          src={slide.src}
+          alt={slide.title}
+          width={slide.width}
+          height={slide.height}
+          placeholder={slide.blurDataUrl ? "blur" : "empty"}
+          blurDataURL={slide.blurDataUrl ?? undefined}
+          priority
+          unoptimized
+          onLoad={() => setLoaded(true)}
+          className={cn(
+            "max-h-[90svh] max-w-[90vw] object-contain",
+            "transition-opacity duration-700 ease-out",
+            loaded ? "opacity-100" : "opacity-0",
+          )}
+          sizes="90vw"
+        />
+      </div>
 
       {/* ── EXIF overlay ──────────────────────── */}
       <div

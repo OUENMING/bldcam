@@ -20,10 +20,10 @@ export const CLASSIC_THEME = {
     width: 1440,
     /** Uniform inset from canvas edges for photo card */
     padding: 90,
-    /** Photo card corner radius */
+    /** Photo card corner radius (squircle continuous corner) */
     radius: 24,
     /** Vertical space reserved for EXIF text below the photo card */
-    textBarH: 96,
+    textBarH: 120,
   },
 
   // ── Background (generated from the photo itself) ──
@@ -86,19 +86,21 @@ export const CLASSIC_THEME = {
   // ── Typography ───────────────────────────────────
   typography: {
     /** Camera brand font size */
-    brandSize: 58,
+    brandSize: 52,
     /** EXIF parameter font size */
-    paramSize: 26,
+    paramSize: 24,
     /** Horizontal gap between brand name and first parameter (SVG dx) */
     paramGap: 18,
-    /** Font stack — Helvetica Neue preferred, graceful fallback to Arial */
-    fontFamily: `'Helvetica Neue',Arial,Helvetica,sans-serif`,
-    /** Brand name: italic 900 for bold photographic identity */
-    brandWeight: 900,
-    /** EXIF params: regular 400 for clean data presentation */
+    /** Brand font: serif for photographic brand identity (Cormorant Garamond style) */
+    brandFont: `'DejaVu Serif','Georgia','Times New Roman',serif`,
+    /** EXIF font: clean sans-serif for parameters */
+    paramFont: `'Helvetica Neue',Arial,sans-serif`,
+    /** Brand name: bold italic 700 (serif) */
+    brandWeight: 700,
+    /** EXIF params: regular 400 (sans) */
     paramWeight: 400,
-    /** EXIF params opacity — slightly less than the pure-white brand name */
-    paramOpacity: 0.82,
+    /** EXIF params opacity */
+    paramOpacity: 0.80,
   },
 
   // ── Output ───────────────────────────────────────
@@ -301,22 +303,21 @@ function buildExifTextSvg(
   const displayBrand = hasContent ? (brand ?? "BLDcam") : "BLDcam";
 
   const cx = Math.round(canvasW / 2);
-  // Visual center: text sits slightly below mathematical center within the footer
-  const y = Math.round(textBarH * 0.55);
+  // Center text vertically within the footer bar
+  const y = Math.round(textBarH / 2);
 
-  // Brand span
+  // Brand span — serif italic bold
   const brandSpan =
-    `<tspan font-style="italic" font-weight="${ty.brandWeight}" font-size="${ty.brandSize}">${esc(displayBrand)}</tspan>`;
+    `<tspan font-family="${ty.brandFont}" font-style="italic" font-weight="${ty.brandWeight}" font-size="${ty.brandSize}">${esc(displayBrand)}</tspan>`;
 
-  // Parameter spans — each gets dx="${paramGap}" so a missing field doesn't collapse spacing
+  // Parameter spans — sans regular, each with fixed dx spacing
   const paramSpans = segs.map((s, i) => {
     const dx = i === 0 ? ty.paramGap : ty.paramGap;
-    return `<tspan dx="${dx}" font-weight="${ty.paramWeight}" font-size="${ty.paramSize}" opacity="${ty.paramOpacity}">${esc(s.text)}</tspan>`;
+    return `<tspan dx="${dx}" font-family="${ty.paramFont}" font-weight="${ty.paramWeight}" font-size="${ty.paramSize}" opacity="${ty.paramOpacity}">${esc(s.text)}</tspan>`;
   }).join("");
 
   return `<svg width="${canvasW}" height="${textBarH}" xmlns="http://www.w3.org/2000/svg">
     <text x="${cx}" y="${y}"
-          font-family="${ty.fontFamily}"
           fill="#ffffff"
           text-anchor="middle">
       ${brandSpan}${paramSpans}
