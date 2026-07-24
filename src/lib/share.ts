@@ -91,12 +91,12 @@ export const CLASSIC_THEME = {
     paramSize: 24,
     /** Horizontal gap between brand name and first parameter (SVG dx) */
     paramGap: 18,
-    /** Brand font: serif for photographic brand identity (Cormorant Garamond style) */
-    brandFont: `'DejaVu Serif','Georgia','Times New Roman',serif`,
+    /** Brand font: modern system sans — matches camera brand identity */
+    brandFont: `system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif`,
     /** EXIF font: clean sans-serif for parameters */
     paramFont: `'Helvetica Neue',Arial,sans-serif`,
-    /** Brand name: bold italic 700 (serif) */
-    brandWeight: 700,
+    /** Brand name: bold 800 — strong brand presence, no italic */
+    brandWeight: 800,
     /** EXIF params: regular 400 (sans) */
     paramWeight: 400,
     /** EXIF params opacity */
@@ -306,9 +306,9 @@ function buildExifTextSvg(
   // Center text vertically within the footer bar
   const y = Math.round(textBarH / 2);
 
-  // Brand span — serif italic bold
+  // Brand span — bold sans-serif, no italic (matches camera brand identity)
   const brandSpan =
-    `<tspan font-family="${ty.brandFont}" font-style="italic" font-weight="${ty.brandWeight}" font-size="${ty.brandSize}">${esc(displayBrand)}</tspan>`;
+    `<tspan font-family="${ty.brandFont}" font-weight="${ty.brandWeight}" font-size="${ty.brandSize}">${esc(displayBrand)}</tspan>`;
 
   // Parameter spans — sans regular, each with fixed dx spacing
   const paramSpans = segs.map((s, i) => {
@@ -319,7 +319,8 @@ function buildExifTextSvg(
   return `<svg width="${canvasW}" height="${textBarH}" xmlns="http://www.w3.org/2000/svg">
     <text x="${cx}" y="${y}"
           fill="#ffffff"
-          text-anchor="middle">
+          text-anchor="middle"
+          dominant-baseline="central">
       ${brandSpan}${paramSpans}
     </text>
   </svg>`;

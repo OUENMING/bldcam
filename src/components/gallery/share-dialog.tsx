@@ -116,13 +116,13 @@ export function ShareDialog({
           )}
 
           {status === "ready" && shareUrl && (
-            <div className="relative w-full overflow-hidden rounded-xl bg-muted/50">
+            <div className="flex justify-center overflow-hidden rounded-xl bg-muted/50">
               <Image
                 src={shareUrl}
                 alt={photoTitle}
                 width={1440}
                 height={0}
-                className="h-auto w-full object-contain"
+                className="h-auto w-auto max-h-[82svh] max-w-full object-contain"
                 unoptimized
                 priority
               />
