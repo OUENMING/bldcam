@@ -9,6 +9,7 @@ export default async function MapPage() {
       latitude: { not: null },
       longitude: { not: null },
     },
+    take: 200,
     select: {
       id: true,
       title: true,

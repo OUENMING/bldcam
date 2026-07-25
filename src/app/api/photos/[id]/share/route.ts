@@ -83,13 +83,10 @@ export async function GET(
     });
   } catch (error) {
     console.error("Share generation failed:", error);
-
-    // Fallback: if we have the photo, return its URL
-    if (error instanceof Error && "id" in (error as any)) {
-      // no-op
-    }
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to generate share image" },
+      { error: "Failed to generate share image", detail: message },
       { status: 500 },
     );
   }

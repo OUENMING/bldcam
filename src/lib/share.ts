@@ -87,22 +87,26 @@ export const CLASSIC_THEME = {
 
   // ── Typography ───────────────────────────────────
   typography: {
-    /** Camera brand font size */
-    brandSize: 52,
-    /** EXIF parameter font size */
-    paramSize: 24,
-    /** Horizontal gap between brand name and first parameter (SVG dx) */
-    paramGap: 18,
-    /** Brand font: modern system sans — matches camera brand identity */
-    brandFont: `system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif`,
-    /** EXIF font: clean sans-serif for parameters */
-    paramFont: `'Helvetica Neue',Arial,sans-serif`,
-    /** Brand name: bold 800 — strong brand presence, no italic */
+    /** Font stack — modern system sans-serif */
+    fontFamily: `system-ui,-apple-system,BlinkMacSystemFont,SF Pro Display,Roboto,Helvetica,Arial,sans-serif`,
+    /** Brand name font size (uppercase) */
+    brandSize: 32,
+    /** Brand name weight (extrabold) */
     brandWeight: 800,
-    /** EXIF params: regular 400 (sans) */
-    paramWeight: 400,
-    /** EXIF params opacity */
-    paramOpacity: 0.80,
+    /** Brand letter-spacing */
+    brandLetterSpacing: 1,
+    /** EXIF parameter font size */
+    paramSize: 21,
+    /** EXIF parameter weight (light) */
+    paramWeight: 300,
+    /** EXIF letter-spacing */
+    paramLetterSpacing: 1.5,
+    /** EXIF line opacity */
+    paramOpacity: 0.65,
+    /** Vertical Y offset for brand line (dominant-baseline: middle) */
+    brandLineY: 48,
+    /** Vertical Y offset for EXIF parameter line */
+    exifLineY: 82,
   },
 
   // ── Output ───────────────────────────────────────
@@ -123,8 +127,8 @@ export type ShareTheme = typeof CLASSIC_THEME;
 // ═══════════════════════════════════════════════════════════
 
 export const SIGNATURE = {
-  /** Signature height as fraction of textBarH */
-  heightRatio: 0.55,
+  /** Fixed target height in px — decoupled from textBarH */
+  targetHeight: 90,
   /** SVG file path relative to process.cwd() */
   svgPath: "public/signature.svg",
   /** Dark colors for light backgrounds */
@@ -144,7 +148,6 @@ interface Layout {
   padX: number;
   padTop: number;
   textBarH: number;
-  textCenterY: number;
   radius: number;
 }
 
@@ -209,7 +212,6 @@ function computeLayout(photoW: number, photoH: number, theme: ShareTheme): Layou
     padX: padding,
     padTop: padding,
     textBarH,
-    textCenterY: padding + cardH + Math.round(textBarH * 0.55),
     radius,
   };
 }
@@ -225,7 +227,7 @@ function formatFocalLength(v: number | null | undefined): string | null {
 
 function formatFNumber(v: number | null | undefined): string | null {
   if (v == null) return null;
-  return `F${v}`;
+  return `F${Math.round(v * 10) / 10}`;
 }
 
 function formatExposure(v: number | null | undefined): string | null {
@@ -306,9 +308,35 @@ function buildOverlaySvg(w: number, h: number, rgb: string, alpha: number): stri
   </svg>`;
 }
 
-/** EXIF text bar — transparent background, horizontal centre-aligned.
- *  Brand name (italic 900) + per-parameter spans (regular 400) in one line.
- *  Each parameter is a separate <tspan> so a missing field doesn't break layout. */
+/** EXIF text bar — clean two-line sans-serif layout.
+ *  Line 1: BRAND (uppercase, heavy) + model (light, dimmed).
+ *  Line 2: EXIF parameters (light, dimmed).
+ *  Model is sanitised to remove redundant brand prefix. */
+function cleanModel(model: string | null, make: string | null, displayBrand: string | null): string | null {
+  if (!model) return null;
+  let m = model.trim();
+  if (make) {
+    const raw = make.trim();
+    // Try stripping the full make string first (e.g. "NIKON CORPORATION")
+    m = m.replace(new RegExp(`^${escRegex(raw)}\\s*`, "i"), "").trim();
+    // Then try the first word of make (e.g. "NIKON")
+    const firstWord = raw.split(/\s+/)[0];
+    if (firstWord) {
+      m = m.replace(new RegExp(`^${escRegex(firstWord)}\\s*`, "i"), "").trim();
+    }
+    // Then try the display brand name (e.g. "Nikon")
+    if (displayBrand) {
+      m = m.replace(new RegExp(`^${escRegex(displayBrand)}\\s*`, "i"), "").trim();
+    }
+  }
+  return m || null;
+}
+
+/** Escape string for use in RegExp constructor. */
+function escRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function buildExifTextSvg(
   canvasW: number,
   textBarH: number,
@@ -320,28 +348,29 @@ function buildExifTextSvg(
   const segs = buildExifSegments(photo);
   const hasContent = brand || segs.length > 0;
   const displayBrand = hasContent ? (brand ?? "BLDcam") : "BLDcam";
+  const model = cleanModel(photo.model, photo.make, brand);
 
   const cx = Math.round(canvasW / 2);
-  // Center text vertically within the footer bar
-  const y = Math.round(textBarH / 2);
+  const line1Y = ty.brandLineY;
+  const line2Y = ty.exifLineY;
 
-  // Brand span — bold sans-serif, no italic (matches camera brand identity)
-  const brandSpan =
-    `<tspan font-family="${ty.brandFont}" font-weight="${ty.brandWeight}" font-size="${ty.brandSize}">${esc(displayBrand)}</tspan>`;
+  // Line 1: brand (heavy) + optional model (light), as plain text — no <tspan>
+  const line1 = model
+    ? `${esc(displayBrand.toUpperCase())}  ${esc(model)}`
+    : `${esc(displayBrand.toUpperCase())}`;
 
-  // Parameter spans — sans regular, each with fixed dx spacing
-  const paramSpans = segs.map((s, i) => {
-    const dx = i === 0 ? ty.paramGap : ty.paramGap;
-    return `<tspan dx="${dx}" font-family="${ty.paramFont}" font-weight="${ty.paramWeight}" font-size="${ty.paramSize}" opacity="${ty.paramOpacity}">${esc(s.text)}</tspan>`;
-  }).join("");
+  // Line 2: EXIF params
+  const exifText = segs.map((s) => s.text).join("  ");
 
   return `<svg width="${canvasW}" height="${textBarH}" xmlns="http://www.w3.org/2000/svg">
-    <text x="${cx}" y="${y}"
-          fill="#ffffff"
-          text-anchor="middle"
-          dominant-baseline="central">
-      ${brandSpan}${paramSpans}
+    <text x="${cx}" y="${line1Y}" fill="#ffffff" text-anchor="middle" dominant-baseline="middle"
+          font-family="${ty.fontFamily}" font-weight="${ty.brandWeight}" font-size="${ty.brandSize}" letter-spacing="${ty.brandLetterSpacing}">
+      ${line1}
     </text>
+    ${exifText ? `<text x="${cx}" y="${line2Y}" fill="#ffffff" text-anchor="middle" dominant-baseline="middle"
+          font-family="${ty.fontFamily}" font-weight="${ty.paramWeight}" font-size="${ty.paramSize}" letter-spacing="${ty.paramLetterSpacing}" opacity="${ty.paramOpacity}">
+      ${esc(exifText)}
+    </text>` : ''}
   </svg>`;
 }
 
@@ -403,24 +432,20 @@ async function renderPhoto(
 ): Promise<Buffer> {
   const { cardW, cardH, radius } = layout;
 
-  // 1. Fix EXIF orientation — rotate() applies Orientation tag
-  const oriented = await sharp(imageBuffer).rotate().toBuffer();
-
-  // 2. Resize — "inside" preserves aspect ratio
-  const resized = await sharp(oriented)
+  // 1. Rotate + resize in a single pipeline, get buffer + dimensions at once
+  const { data: resized, info } = await sharp(imageBuffer)
+    .rotate()
     .resize(cardW, cardH, { fit: "inside", withoutEnlargement: true })
     .png()
-    .toBuffer();
+    .toBuffer({ resolveWithObject: true });
 
-  const meta = await sharp(resized).metadata();
-  const aW = meta.width ?? cardW;
-  const aH = meta.height ?? cardH;
+  const aW = info.width;
+  const aH = info.height;
   const offX = Math.round((cardW - aW) / 2);
   const offY = Math.round((cardH - aH) / 2);
   const base64 = resized.toString("base64");
 
-  // 3. Clip path = actual photo dimensions (not card dimensions).
-  //    Fixes: withoutEnlargement → photo smaller than card → old clip missed corners.
+  // 2. SVG with squircle clip + 3-ring shadow + subtle border
   const filter = buildShadowFilter(theme);
   const clipPath = squirclePath(aW, aH, radius);
   const svg = `<svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg">
@@ -432,6 +457,7 @@ async function renderPhoto(
       <image href="data:image/png;base64,${base64}"
              x="0" y="0" width="${aW}" height="${aH}"
              clip-path="url(#cr)" filter="url(#sh)"/>
+      <rect x="0" y="0" width="${aW}" height="${aH}" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1" clip-path="url(#cr)"/>
     </g>
   </svg>`;
 
@@ -468,24 +494,39 @@ async function isFooterAreaDark(background: Buffer, layout: Layout): Promise<boo
   return (r + g + b) / 3 < SIGNATURE.brightnessThreshold;
 }
 
+// ── Signature SVG in-memory cache (read once, never re-read) ──
+
+let _sigCache: string | null = null;
+
+async function loadSignatureSvg(): Promise<string> {
+  if (_sigCache) return _sigCache;
+  _sigCache = await readFile(
+    path.join(process.cwd(), SIGNATURE.svgPath),
+    "utf-8",
+  );
+  return _sigCache;
+}
+
 async function renderSignature(
   layout: Layout,
   isDarkBg: boolean,
-): Promise<Buffer> {
-  // 1. Read SVG file
+): Promise<{ buffer: Buffer; width: number; height: number }> {
+  // 1. Read SVG file (cached in memory after first read)
   let svgContent: string;
   try {
-    svgContent = await readFile(
-      path.join(process.cwd(), SIGNATURE.svgPath),
-      "utf-8",
-    );
+    svgContent = await loadSignatureSvg();
   } catch {
-    throw new Error(
+    const err = new Error(
       "Signature SVG not found — ensure public/signature.svg exists",
     );
+    // Invalidate cache so it retries next request (e.g. file was recreated)
+    _sigCache = null;
+    throw err;
   }
 
   // 2. Adapt color to background brightness
+  // Clone the cached template because .replace() returns a new string;
+  // the cache stays pristine for concurrent requests.
   if (!isDarkBg) {
     const { primary, secondary } = SIGNATURE.darkColors;
     svgContent = svgContent
@@ -493,50 +534,28 @@ async function renderSignature(
       .replace(/fill="#999999"/g, `fill="${secondary}"`);
   }
 
-  // 3. Parse viewBox for source dimensions
-  const vbMatch = svgContent.match(/viewBox="([^"]+)"/);
-  const [, vbStr] = vbMatch ?? ["", "0 0 1000 1200"];
-  const parts = vbStr.split(/\s+/).map(Number);
-  const [,, vbW, vbH] = parts.length === 4 ? parts : [0, 0, 1000, 1200];
-
-  // 4. Compute target size (constrain by height, preserve aspect ratio)
-  const targetH = Math.round(layout.textBarH * SIGNATURE.heightRatio);
-  const targetW = Math.round(targetH * (vbW / vbH));
-
-  // 5. Render SVG to PNG at target size
-  const signaturePng = await sharp(Buffer.from(svgContent))
-    .resize(targetW, targetH)
+  // 3. Render at fixed height, width auto-scales via aspect ratio
+  const { data: buffer, info } = await sharp(Buffer.from(svgContent))
+    .resize(null, SIGNATURE.targetHeight)
     .png()
-    .toBuffer();
+    .toBuffer({ resolveWithObject: true });
 
-  // 6. Create transparent container (canvasW × textBarH), center signature
-  const offX = Math.round((layout.canvasW - targetW) / 2);
-  const offY = Math.round((layout.textBarH - targetH) / 2);
-
-  return sharp({
-    create: {
-      width: layout.canvasW,
-      height: layout.textBarH,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    },
-  })
-    .composite([{ input: signaturePng, top: offY, left: offX }])
-    .png()
-    .toBuffer();
+  return { buffer, width: info.width, height: info.height };
 }
 
 // ── Composite Renderer ────────────────────────────
+
+type FooterLayer = Buffer | { buffer: Buffer; width: number; height: number };
 
 async function renderComposite(
   background: Buffer,
   overlay: Buffer | null,
   photoCard: Buffer,
-  typography: Buffer,
+  typography: FooterLayer,
   layout: Layout,
   theme: ShareTheme,
 ): Promise<Buffer> {
-  const { padX, padTop, cardH } = layout;
+  const { padX, padTop, cardH, canvasW, textBarH } = layout;
 
   const layers: sharp.OverlayOptions[] = [];
 
@@ -547,8 +566,14 @@ async function renderComposite(
   // Photo card (shadow is baked into the SVG via feDropShadow filter)
   layers.push({ input: photoCard, top: padTop, left: padX });
 
-  // EXIF text below the card
-  layers.push({ input: typography, top: padTop + cardH, left: 0 });
+  // Footer: EXIF text (Buffer) or signature (object with dimensions)
+  if (Buffer.isBuffer(typography)) {
+    layers.push({ input: typography, top: padTop + cardH, left: 0 });
+  } else {
+    const offX = Math.round((canvasW - typography.width) / 2);
+    const offY = Math.round((textBarH - typography.height) / 2);
+    layers.push({ input: typography.buffer, top: padTop + cardH + offY, left: offX });
+  }
 
   return sharp(background)
     .composite(layers)
@@ -593,7 +618,7 @@ export async function generateShareImage(
   const background = await renderBackground(imageBuffer, layout, theme);
 
   const isSignature = template === "signature";
-  let footerLayer: Buffer;
+  let footerLayer: FooterLayer;
 
   if (isSignature) {
     const isDark = await isFooterAreaDark(background, layout);

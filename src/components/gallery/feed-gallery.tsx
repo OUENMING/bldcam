@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useState } from "react";
+import { useInViewOnce } from "@/hooks/use-in-view-once";
 import { cn } from "@/lib/utils";
 import { useImageDisplaySize } from "@/hooks/use-image-display-size";
 import { formatExifLine, formatLocation } from "@/lib/format";
@@ -27,35 +28,16 @@ function FeedCard({
   priority?: boolean;
   onClick?: () => void;
 }) {
-  const [inView, setInView] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const { ref, inView } = useInViewOnce();
   const exifLine = formatExifLine(photo);
   const locationLine = formatLocation(photo);
 
   const displaySize = useImageDisplaySize(photo.width, photo.height);
 
-  useEffect(() => {
-    const el = cardRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.05, rootMargin: "200px" },
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <div
-      ref={cardRef}
+      ref={ref}
       className={cn(
         "flex w-full flex-col items-center",
         "transition-[opacity,transform] duration-700 ease-out",

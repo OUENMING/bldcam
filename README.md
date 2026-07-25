@@ -2,6 +2,7 @@
 
 > 个人星空摄影作品展示网站，记录每一次追星之旅
 
+[![Version](https://img.shields.io/badge/version-2.0.0-purple?style=flat-square)](https://bldcam.page)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org/)
 [![Deployed](https://img.shields.io/badge/Deployed-bldcam.page-blue?style=flat-square)](https://bldcam.page)
@@ -30,14 +31,16 @@ BLDcam 是一个个人星空摄影作品集网站。围绕摄影作品展示、�
 
 | 功能名称 | 功能说明 | 技术栈 | 更新时间 | 版本 |
 |---------|---------|--------|----------|------|
-| 摄影画廊 | 瀑布流布局展示 | React + Tailwind | 2026-07-19 | v0.1.0 |
-| 地图标记 | 照片拍摄地点标记 | MapLibre + react-map-gl | 2026-07-19 | v0.1.0 |
-| EXIF 提取 | 自动读取相机参数 | exifr | 2026-07-19 | v0.1.0 |
-| 夜间模式 | 星空专用暗色主题 | React Context | 2026-07-19 | v0.1.0 |
-| 双视图模式 | 沉浸/列表切换 | React Context | 2026-07-19 | v0.1.0 |
-| AI 描述 | 自动生成照片故事 | 豆包 Seed 2.0 | 2026-07-19 | v0.1.0 |
-| 管理后台 | 照片上传/编辑/管理 | Next.js admin route | 2026-07-19 | v0.1.0 |
-| 图片存储 | Cloudflare R2 对象存储 | @aws-sdk/client-s3 | 2026-07-19 | v0.1.0 |
+| 摄影画廊 | 瀑布流布局展示 | React + Tailwind | 2026-07-04 | v1.0 |
+| 地图标记 | 照片拍摄地点标记 | MapLibre + Supercluster | 2026-07-04 | v1.0 |
+| EXIF 提取 | 自动读取相机参数 | exifr | 2026-07-04 | v1.0 |
+| 夜间模式 | 星空专用暗色主题 | React Context | 2026-07-04 | v1.0 |
+| 双视图模式 | 沉浸/列表切换 | React Context | 2026-07-04 | v1.0 |
+| AI 描述 | 自动生成照片故事 | Gemini API | 2026-06-20 | v1.0 |
+| 管理后台 | 照片上传/编辑/管理 | Next.js admin route | 2026-06-21 | v1.0 |
+| 图片存储 | Cloudflare R2 对象存储 | @aws-sdk/client-s3 | 2026-06-14 | v1.0 |
+| 分享图 | 经典 EXIF + 签名 SVG 双模板 | Sharp 服务端合成 | 2026-07-24 | v1.8 |
+| 分享图 UI | 弹窗预览 + 模板切换 | shadcn Dialog + YARL portal | 2026-07-26 | v2.0 |
 
 ## 技术栈
 

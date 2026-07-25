@@ -1,0 +1,286 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BLDcam · 项目全历程</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,600&family=Inter:wght@400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,system-ui,sans-serif;background:#0a0a0a;color:#e0e0e0;line-height:1.6}
+header{background:linear-gradient(135deg,#0f0f0f 0%,#1a1a2e 100%);border-bottom:1px solid rgba(255,255,255,.06);padding:60px 24px 50px;text-align:center}
+header h1{font-size:3.2rem;font-weight:800;letter-spacing:-.03em;margin-bottom:8px}
+header h1 span{color:#c084fc}
+header p{color:#888;font-size:1.05rem}
+.badge{display:inline-block;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.25);border-radius:20px;padding:3px 14px;font-size:.8rem;font-weight:600;margin-top:12px}
+.container{max-width:1100px;margin:0 auto;padding:40px 24px 120px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:50px}
+.stat{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:20px;text-align:center}
+.stat .num{font-size:2rem;font-weight:800;color:#c084fc}
+.stat .lbl{font-size:.8rem;color:#888;margin-top:4px}
+.version-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:40px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.06)}
+.vtab{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 16px;cursor:pointer;transition:.2s;font-size:.85rem;font-weight:500;min-width:80px;text-align:center}
+.vtab:hover,.vtab.active{background:rgba(192,132,252,.12);border-color:#c084fc;color:#c084fc}
+.vtab .vnum{font-size:.7rem;color:#666;display:block;margin-top:2px}
+.phase{margin-bottom:50px}
+.phase h2{font-size:1.6rem;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+.phase .date{color:#666;font-size:.85rem;font-weight:400}
+.phase p.desc{color:#888;font-size:.92rem;margin-bottom:20px}
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px 20px;display:flex;align-items:flex-start;gap:14px;transition:.2s}
+.card:hover{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.1)}
+.card .icon{font-size:1.3rem;width:32px;text-align:center;flex-shrink:0;margin-top:2px}
+.card .body{flex:1;min-width:0}
+.card .body strong{font-weight:600;color:#f0f0f0}
+.card .body p{color:#999;font-size:.85rem;margin-top:2px}
+.tech-box{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px 24px;margin-top:30px}
+.tech-box h3{font-size:1rem;font-weight:600;margin-bottom:10px;color:#aaa}
+.tech-box code{display:block;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:14px 16px;color:#c084fc;font-size:.82rem;line-height:1.5;white-space:pre-wrap;word-break:break-all;font-family:'JetBrains Mono',monospace}
+.ver{display:inline-block;background:rgba(192,132,252,.12);color:#c084fc;border-radius:6px;padding:1px 10px;font-size:.75rem;font-weight:600;margin-left:8px;vertical-align:middle}
+@media(max-width:700px){header h1{font-size:2.2rem}.stats{grid-template-columns:repeat(2,1fr)}}
+</style></head><body>
+
+<header>
+<h1>BLD<span>cam</span></h1>
+<p>从零搭建的个人星空摄影作品集 · 全流程纪实</p>
+<div class="badge">v2.0.0 — 2026.07.26 · Final Audit Passed</div>
+</header>
+
+<div class="container">
+
+<!-- stats -->
+<div class="stats">
+<div class="stat"><div class="num">43</div><div class="lbl">天开发周期</div></div>
+<div class="stat"><div class="num">67</div><div class="lbl">次提交</div></div>
+<div class="stat"><div class="num">13</div><div class="lbl">缓存版本迭代</div></div>
+<div class="stat"><div class="num">57</div><div class="lbl">源文件</div></div>
+<div class="stat"><div class="num">2</div><div class="lbl">分享图模板</div></div>
+<div class="stat"><div class="num">50+</div><div class="lbl">照片已上传</div></div>
+</div>
+
+<!-- version selector -->
+
+<div class="version-tabs">
+<div class="vtab active" onclick="showVer('v1')">v1.0<div class="vnum">Phase 1-7</div></div>
+<div class="vtab" onclick="showVer('v1_5')">v1.5<div class="vnum">SEO + UI</div></div>
+<div class="vtab" onclick="showVer('v1_8')">v1.8<div class="vnum">分享图</div></div>
+<div class="vtab" onclick="showVer('v2')">v2.0<div class="vnum">Final</div></div>
+</div>
+
+<!-- ========== PHASE 0 ========== -->
+
+<div id="v1" class="phase">
+<h2>Phase 0  — 搭建与基建 <span class="date">2026.06.13-14</span></h2>
+<p class="desc">Next.js + TypeScript + Prisma + SQLite + Tailwind + shadcn/ui + R2 — 选型与脚手架</p>
+<div class="cards">
+<div class="card"><div class="icon">🏗️</div><div class="body"><strong>项目初始化</strong><p>Create Next App 起步，App Router + TypeScript + ESLint + Turbopack</p></div></div>
+<div class="card"><div class="icon">🐳</div><div class="body"><strong>双平台兼容</strong><p>Prisma + Sharp 在 macOS 开发、Linux VPS 生产双平台跑通。关键：dependabot 级联原生依赖</p></div></div>
+<div class="card"><div class="icon">🚀</div><div class="body"><strong>一键部署</strong><p>本地 build → rsync → VPS → PM2 拉起。nohup + PM2 jlist 轮询防断连</p></div></div>
+</div>
+<div class="tech-box"><h3>🔧 技术要点</h3><code># 双平台 Sharp 兼容 — mac 编译产物 ≠ linux，VPS 上必须 npm rebuild sharp
+deploy.sh: rsync --exclude=node_modules/
+vps-setup.sh: npm rebuild sharp && npx prisma generate
+
+# 跨平台 Prisma 引擎
+prisma/schema.prisma → schema.prisma 纯文本
+prisma generate 在两次平台分别生成
+
+# PM2 部署
+nohup bash vps-setup.sh > /tmp/bldcam-deploy.log 2>&1 &
+pm2 jlist → poll status → online</code></div>
+</div>
+
+<!-- ========== PHASE 1-7 ========== -->
+
+<div class="phase">
+<h2>Phase 1-7  — 核心功能全景 <span class="date">2026.06.14-15</span></h2>
+<p class="desc">一次大提交覆盖全部业务功能：上传管线 → 画廊 → 详情 → 地图 → AI → 后台 → 移动端</p>
+<div class="cards">
+<div class="card"><div class="icon">📤</div><div class="body"><strong>上传管线（Pipeline）</strong><p>EXIF 提取 → 压缩 → 缩略图 → Blurhash → LQIP → R2 上传 → DB 写。六步并行三步。上传失败自动回滚：<code>deleteFromR2(uploadedKeys)</code></p></div></div>
+<div class="card"><div class="icon">🖼️</div><div class="body"><strong>瀑布流画廊</strong><p><code>columns-n</code> CSS 瀑布流 + hover 渐显信息覆盖层 + IntersectionObserver 入场动画</p></div></div>
+<div class="card"><div class="icon">📋</div><div class="body"><strong>Feed 流模式</strong><p>全宽版画廊，单列大图纵向排列，适合讲故事</p></div></div>
+<div class="card"><div class="icon">💡</div><div class="body"><strong>灯箱（Lightbox）</strong><p>YARL（yet-another-react-lightbox）主引擎 + Zoom 插件 + 自定义 Slide 展示 EXIF + 分享按钮</p></div></div>
+<div class="card"><div class="icon">🗺️</div><div class="body"><strong>地图</strong><p>MapLibre GL JS + Supercluster 聚类 + 弹窗卡片</p></div></div>
+<div class="card"><div class="icon">🤖</div><div class="body"><strong>AI 自动起名+分类</strong><p>发送照片到 Gemini API → 返回标题 + 10 分类体系（静物美学/城市漫步/星空…）</p></div></div>
+<div class="card"><div class="icon">⚙️</div><div class="body"><strong>后台管理</strong><p>简易 admin token 登录 → 上传/编辑/删除/旋转照片</p></div></div>
+</div>
+<div class="tech-box"><h3>🔧 上传 Pipeline 技术细节</h3><code>// 内存阶段—三步并行
+const [exif, {width, height, ...}, blur] = await Promise.all([
+  extractExif(buf),
+  processImage(buf),       // sharp resize + webp 80
+  generateBlurDataURL(buf), // sharp resize 16x16 → base64
+]);
+
+// 上传阶段
+const [photoUrl, thumbUrl] = await Promise.all([
+  uploadToR2(...),
+  uploadToR2(...),
+]);
+
+// 失败回滚
+try { ... } catch {
+  if (uploadedKeys.length > 0) await deleteFromR2(uploadedKeys);
+  throw;
+}
+
+// AI 建议（fire & forget，不阻塞上传）
+fetchAiSuggestion(file).then(({suggestedTitle, suggestedCategory}) => {
+  setQueue(prev => prev.map(e => e.id === id ? {...e, ...} : e));
+});</code></div>
+</div>
+
+<!-- ========== AI ========== -->
+
+<div class="phase">
+<h2>Phase AI  — 模型选择与 Prompt 工程 <span class="date">2026.06.16-20</span></h2>
+<p class="desc">从 test/fail → Gemini 1.5 → 多模型切换 → 10 分类体系</p>
+<div class="cards">
+<div class="card"><div class="icon">🔄</div><div class="body"><strong>模型切换</strong><p>硅基流动 Qwen → 失败 → Gemini 1.5 Flash（免费）→ cc-switch 降级策略</p></div></div>
+<div class="card"><div class="icon">📝</div><div class="body"><strong>Prompt 工程</strong><p>从自由发挥 → 10 固定分类 + 视觉主体识别 + 结构化 JSON 输出</p></div></div>
+<div class="card"><div class="icon">⏱️</div><div class="body"><strong>超时控制</strong><p>串行请求（防限频） + 35s setTimeout abort</p></div></div>
+</div>
+<div class="tech-box"><h3>📝 Prompt 示例</h3><code>为这张照片生成一个简短的标题（3-6字中文）并从以下10分类中选择最匹配的1个：
+静物美学,城市漫步,星空,街头摄影,人像,风光,建筑,野生/动物,美食/饮品,抽象/创意
+输出 JSON: { "suggestedTitle": "...", "suggestedCategory": "..." }</code></div>
+</div>
+
+<!-- ========== SEO ========== -->
+
+<div class="phase">
+<h2>Phase SEO — 独立详情页 + 搜索引擎 <span class="date">2026.06.21</span></h2>
+<p class="desc">每张照片独立 URL + sitemap.xml + robots.txt + JSON-LD + Baidu 推送</p>
+<div class="cards">
+<div class="card"><div class="icon">🔗</div><div class="body"><strong>/photo/[slug]</strong><p>每张照片独立页 + generateMetadata() 输出全尺寸 OG image</p></div></div>
+<div class="card"><div class="icon">🗺️</div><div class="body"><strong>Sitemap + Robots</strong><p>自动生成所有照片 URL + 百度验证 + robots.txt 允许全部</p></div></div>
+<div class="card"><div class="icon">📄</div><div class="body"><strong>JSON-LD 结构化数据</strong><p>Schema.org Photograph 类型输出，含 EXIF 数组 + GPS</p></div></div>
+</div>
+</div>
+
+<!-- ========== UI v2 ========== -->
+
+<div class="phase">
+<h2>Phase UI v2 — 视觉升级 + 侧边栏 <span class="date">2026.07.04-05</span></h2>
+<p class="desc">暗黑风统一、字体系统、城市分类、滚动条修复</p>
+<div class="cards">
+<div class="card"><div class="icon">🌗</div><div class="body"><strong>二元亮暗主题</strong><p>暗黑 background → 统一 foreground/60/70 色阶 + border-border/50</p></div></div>
+<div class="card"><div class="icon">🗂️</div><div class="body"><strong>侧边栏分组</strong><p>城市按国家分组（中国→广州/深圳，爱尔兰→都柏林）+ 分类筛选</p></div></div>
+<div class="card"><div class="icon">📏</div><div class="body"><strong>滚动条缝隙修复</strong><p>YARL 打开时 `scrollbar-gutter: stable` + `overflow: hidden` 200ms 过渡</p></div></div>
+</div>
+</div>
+
+<!-- ========== SHARE CARDS ========== -->
+
+<div class="phase">
+<h2>Phase Share — 分享图引擎 13 次迭代 <span class="date">2026.07.23-24</span></h2>
+<p class="desc">从零到双模板引擎，13 次缓存版本迭代。这是项目最复杂的模块</p>
+<div class="cards">
+<div class="card"><div class="icon">0️⃣</div><div class="body"><strong>v0 毛玻璃基础</strong><p>Sharp 合成引擎：blur 52 毛玻璃背景 + 双层悬浮阴影 + 透明 EXIF 栏。尺寸 1440× 自适应</p></div></div>
+<div class="card"><div class="icon">📐</div><div class="body"><strong>v1 模块化重构</strong><p>Theme 配置独立 → 5 个模块化渲染器（Background/Overlay/Photo/Typography/Composite）+ 删除暗角</p></div></div>
+<div class="card"><div class="icon">☀️</div><div class="body"><strong>v2-v6 视觉校准</strong><p>三层 feDropShadow（2+8+24px 逐步消散）→ 垂直居中 → dest-in 降质修复 → base64 保比例</p></div></div>
+<div class="card"><div class="icon">🏔️</div><div class="body"><strong>v7-v12 高精度渲染</strong><p>SVG feDropShadow 替代黑矩形 → squircle 连续圆角 → serif/sans 字体选择 → dominant-baseline 居中 → EXIF 旋转 → cache key 12 次迭代</p></div></div>
+<div class="card"><div class="icon">✨</div><div class="body"><strong>双模板上线</strong><p>classic（品牌+EXIF）+ signature（SVG LOGO）双路线，自适应亮暗底色</p></div></div>
+</div>
+<div class="tech-box"><h3>🔧 分享图渲染管线</h3><code>export async function generateShareImage(photo, imageBuffer, theme, template) {
+  // 1. 计算布局
+  const layout = computeLayout(meta.width, meta.height, theme);
+
+  // 2. 先渲背景（签名需要检测底部亮度）
+  const background = await renderBackground(imageBuffer, layout, theme);
+
+  // 3. Footer 层：经典 EXIF 或 签名 SVG
+  if (template === "signature") {
+    const isDark = await isFooterAreaDark(background, layout);
+    footerLayer = await renderSignature(layout, isDark);
+  } else {
+    footerLayer = await renderTypography(layout, photo, theme);
+  }
+
+  // 4. 并行渲照片 + 叠加层
+  const [overlay, photoCard] = await Promise.all([
+    renderOverlay(layout, theme),
+    renderPhoto(imageBuffer, layout, theme),  // rotate+resize+clip+shadow+1px edge
+  ]);
+
+  // 5. 合成：bg → overlay → photoCard → footer
+  const buffer = await renderComposite(background, overlay, photoCard, footerLayer, layout, theme);
+  return { buffer, layout };
+}</code></div>
+</div>
+
+<!-- ========== v2.0 FINAL ========== -->
+
+<div id="v2" class="phase">
+<h2>v2.0 Final — 终极审查 + 审计 <span class="date">2026.07.24-26</span></h2>
+<p class="desc">全代码库逐文件审查，12 项修复，确认无暗病</p>
+<div class="cards">
+<div class="card"><div class="icon">🔴</div><div class="body"><strong>P0 — 高危修复</strong><p>4 项：分享弹窗 z-index → 叠在 lightbox 之上（不关大图）| 浏览器 popstate 回退 | 上传 AbortController | 旋转全局锁→单任务锁</p></div></div>
+<div class="card"><div class="icon">🟡</div><div class="body"><strong>P1 — 性能修复</strong><p>5 项：admin/地图加 LIMIT 200 | 共享 `useInViewOnce` hook（~100 observer→1）| handleShare useRef 防 toolbar 重挂 | useCallback 防重渲 | OG 图用全尺寸</p></div></div>
+<div class="card"><div class="icon">🔵</div><div class="body"><strong>架构改进</strong><p>renderSignature SVG 内存缓存 | renderPhoto 单 pipeline | 删除死代码 r2 老函数/modelSize 配置</p></div></div>
+</div>
+</div>
+
+<!-- ========== LEARNINGS ========== -->
+
+<div class="phase">
+<h2>📚 技术经验与教训</h2>
+<div class="tech-box"><h3>1. SVG → librsvg 版本敏感</h3><code>// ❌ VPS 失败（本地正常）：
+<tspan font-family="..." letter-spacing="2">NIKON</tspan>
+
+// ✅ 修复：所有属性移到父 <text>，<tspan> 只保留 weight/size
+<text font-family="..." letter-spacing="2">
+  <tspan font-weight="800" font-size="32">NIKON</tspan>
+</text>
+
+// 🐛 字体引号陷阱：fontFamily 里的 "SF Pro Display" 在被放入
+// SVG 属性 font-family="..." 时 → 属性提前断裂
+// 修复：去掉引号 → SF Pro Display</code></div>
+<div class="tech-box"><h3>2. Blob URL 泄漏</h3><code>// ❌ 切模板时旧 URL.revokeObjectURL 被遗漏
+setShareUrl(URL.createObjectURL(blob));
+// → 每次切换构建一个永不释放的 blob
+
+// ✅ 单 blobRef + seq 竞态
+revoke(blobRef.current);
+blobRef.current = URL.createObjectURL(blob);
+// cleanup unmount → revoke(blobRef.current)</code></div>
+<div class="tech-box"><h3>3. IntersectionObserver 膨胀</h3><code>// ❌ 每张照片创建独立 observer → 100 张照片 = 100 个 Observer
+useEffect(() => {
+  const obs = new IntersectionObserver(...);
+  obs.observe(el);
+  return () => obs.disconnect();
+}, []);
+
+// ✅ 抽取共享 hook，firedRef 防重复
+export function useInViewOnce() {
+  const ref = useCallback((el) => {
+    if (!el || firedRef.current) return;
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        firedRef.current = true;
+        setInView(true);
+        obs.disconnect();
+      }
+    }, ...);
+    obs.observe(el);
+  }, []);
+  return { ref, inView };
+}</code></div>
+<div class="tech-box"><h3>4. 分享图生成耗时分析</h3><code>总耗时 ~5.5s (R2 原图下载 ~3-4s + 毛玻璃 blur ~1s + 照片缩放 ~0.5s + 合成 ~0.2s)
+
+瓶颈：原图在 R2 的 6000×4000 WebP（~3-5MB）。优化方向：
+- 上传时额外生成一个 2400px 的“分享用”副本
+- 或在 share route 中用 thumbnailUrl 替代 photo.url</code></div>
+<div class="tech-box"><h3>5. 上传取消 = XHR + AbortController</h3><code>// XMLHttpRequest 支持 upload.onprogress（fetch 不支持）
+// 但 fetch 支持 AbortController
+
+// 方案：XHR 上传 + AbortController 信号
+const controller = new AbortController();
+uploadWithProgress(formData, onProgress, controller.signal);
+
+componentWillUnmount → controller.abort();
+
+// XHR.onabort handler → Promise reject → caught by upload loop → break</code></div>
+</div>
+
+</div>
+<script>
+function showVer(v){document.querySelectorAll('.phase,.version-group').forEach(e=>e.style.display=e.id===v?'block':'none');document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('active',t.getAttribute('onclick')?.includes(v)))}
+document.querySelectorAll('.phase').forEach(p=>p.style.display='block');
+</script>
+</body></html>

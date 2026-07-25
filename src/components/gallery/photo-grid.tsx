@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useInView } from "react-intersection-observer";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
@@ -46,12 +46,24 @@ export function PhotoGrid({
   // ── Share dialog state ─────────────────────────
   const [sharePhotoId, setSharePhotoId] = useState<string | null>(null);
   const [sharePhotoTitle, setSharePhotoTitle] = useState("");
+  // Stable ref to latest photos array so handleShare doesn't
+  // depend on it directly (avoids YARL toolbar re-mount on pagination)
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
 
-  // Update URL bar when lightbox opens (no page navigation)
+  // Sync URL when lightbox opens AND handle browser back/forward
   useEffect(() => {
     if (open && photos[index]?.slug) {
-      window.history.replaceState(null, "", `/photo/${photos[index].slug}`);
+      const target = `/photo/${photos[index].slug}`;
+      window.history.replaceState({ lightboxIndex: index }, "", target);
     }
+
+    const onPop = () => {
+      // Browser back/forward → close the lightbox
+      setOpen(false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, [open, index, photos[index]?.slug]);
 
   const { mode } = useViewMode();
@@ -60,13 +72,11 @@ export function PhotoGrid({
   const loadedCount = photos.length;
 
   const handleShare = useCallback((photoId: string) => {
-    setOpen(false); // Close lightbox before opening share dialog (z-index conflict)
-    const p = photos.find((ph) => ph.id === photoId);
-    if (p) {
-      setSharePhotoId(photoId);
-      setSharePhotoTitle(p.title);
-    }
-  }, [photos]);
+    const p = photosRef.current.find((ph) => ph.id === photoId);
+    if (!p) return;
+    setSharePhotoId(photoId);
+    setSharePhotoTitle(p.title);
+  }, []);
 
   // ── Fetch next page ───────────────────────────
 
@@ -187,6 +197,7 @@ export function PhotoGrid({
           onOpenChange={(val) => {
             if (!val) setSharePhotoId(null);
           }}
+          key={sharePhotoId}
         />
       )}
     </>

@@ -42,14 +42,14 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
 
   const [deleteTarget, setDeleteTarget] = useState<Photo | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [rotating, setRotating] = useState(false);
+  const [rotating, setRotating] = useState<string | null>(null); // photo id, not global
 
   // ── Rotate logic ─────────────────────────────────
 
   const handleRotate = useCallback(
     async (photo: Photo, angle: number) => {
       if (rotating) return;
-      setRotating(true);
+      setRotating(photo.id);
       try {
         const res = await fetch("/api/photos/rotate", {
           method: "POST",
@@ -65,7 +65,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
       } catch {
         toast.error("旋转失败");
       } finally {
-        setRotating(false);
+        setRotating(null);
       }
     },
     [rotating, photos, onPhotosChange],
@@ -263,7 +263,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
                         <button
                           type="button"
                           onClick={() => handleRotate(photo, -90)}
-                          disabled={rotating}
+                          disabled={rotating != null}
                           className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground/80 transition-colors disabled:opacity-30"
                           title="向左旋转 90°"
                         >
@@ -272,7 +272,7 @@ export function PhotoList({ photos, onPhotosChange }: PhotoListProps) {
                         <button
                           type="button"
                           onClick={() => handleRotate(photo, 90)}
-                          disabled={rotating}
+                          disabled={rotating != null}
                           className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground/80 transition-colors disabled:opacity-30"
                           title="向右旋转 90°"
                         >

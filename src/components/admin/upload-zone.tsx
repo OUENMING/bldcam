@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,7 @@ function formatSize(bytes: number): string {
 function uploadWithProgress(
   formData: FormData,
   onProgress: (pct: number) => void,
+  signal?: AbortSignal,
 ): Promise<Photo> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -72,6 +73,14 @@ function uploadWithProgress(
     };
 
     xhr.onerror = () => reject(new Error("Network error"));
+    xhr.onabort = () => reject(new Error("Aborted"));
+
+    // Wire AbortController → XHR
+    if (signal) {
+      const onAbort = () => { xhr.abort(); };
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+
     xhr.send(formData);
   });
 }
@@ -124,6 +133,15 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
   const [batchUploading, setBatchUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Cleanup: abort in-flight uploads on unmount to prevent
+  // state updates on unmounted component
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   // ── AI suggestion (fire-and-forget) ─────────────
 
@@ -219,7 +237,12 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
     let successCount = 0;
     let failCount = 0;
 
+    // Create fresh AbortController for this batch
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     for (const entry of pending) {
+      if (controller.signal.aborted) break;
       setQueue((prev) =>
         prev.map((e) =>
           e.id === entry.id
@@ -246,7 +269,7 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
               e.id === entry.id ? { ...e, progress: pct } : e,
             ),
           );
-        });
+        }, controller.signal);
 
         setQueue((prev) =>
           prev.map((e) =>
@@ -267,6 +290,7 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
           ),
         );
         failCount++;
+        if (err instanceof Error && err.message === "Aborted") break;
       }
     }
 

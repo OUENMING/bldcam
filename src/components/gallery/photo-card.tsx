@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useState } from "react";
+import { useInViewOnce } from "@/hooks/use-in-view-once";
 import { cn } from "@/lib/utils";
 import { formatExifLine } from "@/lib/format";
 import type { Photo } from "@prisma/client";
@@ -17,32 +18,12 @@ interface PhotoCardProps {
 
 function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [inView, setInView] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const { ref, inView } = useInViewOnce();
   const exifLine = formatExifLine(photo);
-
-  // ── Intersection Observer: scroll-triggered entry animation ──
-  useEffect(() => {
-    const el = cardRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.05, rootMargin: "200px" },
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
 
   return (
     <div
-      ref={cardRef}
+      ref={ref}
       className={cn(
         "mb-2 break-inside-avoid select-none sm:mb-3 md:mb-4",
         inView && isLoaded
