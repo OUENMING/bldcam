@@ -2,7 +2,7 @@
 
 > 个人星空摄影作品展示网站，记录每一次追星之旅
 
-[![Version](https://img.shields.io/badge/version-2.0.0-purple?style=flat-square)](https://bldcam.page)
+[![Version](https://img.shields.io/badge/version-2.0.1-purple?style=flat-square)](https://bldcam.page)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org/)
 [![Deployed](https://img.shields.io/badge/Deployed-bldcam.page-blue?style=flat-square)](https://bldcam.page)
@@ -41,6 +41,8 @@ BLDcam 是一个个人星空摄影作品集网站。围绕摄影作品展示、�
 | 图片存储 | Cloudflare R2 对象存储 | @aws-sdk/client-s3 | 2026-06-14 | v1.0 |
 | 分享图 | 经典 EXIF + 签名 SVG 双模板 | Sharp 服务端合成 | 2026-07-24 | v1.8 |
 | 分享图 UI | 弹窗预览 + 模板切换 | shadcn Dialog + YARL portal | 2026-07-26 | v2.0 |
+| 原图下载 | WebP→PNG 转码下载 | Sharp 服务端转码 | 2026-08-06 | v2.0.1 |
+| 分享图稳定性 | 已缓存直接返回 PNG + CDN 边缘缓存 | R2 Custom Domain + 服务端代理 | 2026-08-06 | v2.0.1 |
 
 ## 技术栈
 
@@ -160,6 +162,7 @@ bash deploy.sh      # 一键推送到 VPS
 ```
 
 项目部署在 https://bldcam.page，使用 VPS + PM2 + Nginx 运行。
+图片经 Cloudflare R2 Custom Domain 提供：`cdn.bldcam.page` 在 R2 桶 `photosave` 的 **Settings → Custom Domains** 中连接，启用边缘缓存（对象带 `max-age=31536000, immutable`）。若分享图/图片变慢或"有时加载失败"，先查该连接是否还在、GET 响应头 `cf-cache-status` 是否为 `HIT`。
 
 ## 设计哲学
 
@@ -173,6 +176,8 @@ bash deploy.sh      # 一键推送到 VPS
 2. **Sharp** 用 `fit: "inside"` 保留原比例，别用 `fit: "cover"`——否则瀑布流像砖墙一样死板
 3. **腾讯云 22 端口被拦截** — 换 2222 端口连接
 4. **rsync `--delete` 把数据库清了** — 必须加 `--exclude='dev.db'`
+5. **分享图已缓存返回 JSON 的坑** — 前端 `fetch` 默认 `Accept: */*`，API 若对非 `image/*` 返回 JSON，前端 `blob.type` 判断会抛 "Not an image" 显示"生成失败"。修复：已缓存时服务端代理返回真 PNG（image 客户端仍走 307 直连）
+6. **R2 的 HEAD 请求恒返回 `cf-cache-status: DYNAMIC`** — 测 R2/CDN 缓存必须用 GET，用 `curl -I` 会被误导；且 R2/CDN 无 CORS 头时，前端 fetch 不能跟随跨域 307，只能服务端代理或用 `<img>` 直载
 
 ## 项目总结
 
