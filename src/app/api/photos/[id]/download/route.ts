@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 
 // ═══════════════════════════════════════════════════════
 // GET /api/photos/[id]/download
-//   Proxies the photo's original R2 URL as a file download.
+//   Proxies the photo's stored R2 image, transcodes WebP → PNG,
+//   and serves it as a file download.
 //   All stored images are WebP (2000px optimized via pipeline).
 //   No orig format is preserved — the best available is served.
 // ═══════════════════════════════════════════════════════
@@ -27,15 +29,16 @@ export async function GET(
     }
 
     const buffer = Buffer.from(await res.arrayBuffer());
+    const pngBuf = await sharp(buffer).png().toBuffer();
     const filename = photo.slug
-      ? `${photo.slug}.webp`
-      : `${photo.id}.webp`;
+      ? `${photo.slug}.png`
+      : `${photo.id}.png`;
 
-    return new NextResponse(new Uint8Array(buffer), {
+    return new NextResponse(new Uint8Array(pngBuf), {
       headers: {
-        "Content-Type": "image/webp",
+        "Content-Type": "image/png",
         "Content-Disposition": `attachment; filename="${filename}"`,
-        "Content-Length": String(buffer.length),
+        "Content-Length": String(pngBuf.length),
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });

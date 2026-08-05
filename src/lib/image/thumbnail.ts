@@ -23,7 +23,7 @@ export async function processImage(buffer: Buffer): Promise<ProcessedImage> {
     image
       .clone()
       .resize(2000, 2000, { fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 80 })
+      .webp({ quality: 90 })
       .toBuffer(),
 
     // Thumbnail: 800px, inside (preserves aspect ratio), webp
