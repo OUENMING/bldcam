@@ -45,11 +45,28 @@ export async function GET(
     try {
       const head = await fetch(shareUrl, { method: "HEAD" });
       if (head.ok) {
+        // Image clients (og tags, <img>, direct links) → 307 straight to the CDN.
         const accept = request.headers.get("accept") || "";
         if (accept.startsWith("image/")) {
           return NextResponse.redirect(shareUrl, 307);
         }
-        return NextResponse.json({ url: shareUrl, cached: true });
+        // Everything else (ShareDialog fetch, browser tab) → proxy the cached
+        // PNG through the API so the body is always image/png. Returning JSON
+        // here made the frontend's fetch→blob→<img> throw "Not an image" and
+        // show 生成失败 on every already-cached share.
+        const img = await fetch(shareUrl, {
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (img.ok) {
+          const buf = Buffer.from(await img.arrayBuffer());
+          return new NextResponse(new Uint8Array(buf), {
+            headers: {
+              "Content-Type": "image/png",
+              "Cache-Control": "public, max-age=31536000, immutable",
+            },
+          });
+        }
+        // CDN transient failure — fall through and regenerate
       }
     } catch {
       // HEAD failed — proceed to generate
