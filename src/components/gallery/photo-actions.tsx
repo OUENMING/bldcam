@@ -21,7 +21,7 @@ export function PhotoActions({
         <a
           href={`/api/photos/${photoId}/download`}
           download
-          className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-card px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <Download className="h-4 w-4" />
           下载原图

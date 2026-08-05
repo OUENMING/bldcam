@@ -6,9 +6,9 @@ import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
-  ChevronRight,
   ChevronDown,
   MapPin,
+  Menu,
   Tag,
 } from "lucide-react";
 
@@ -81,7 +81,7 @@ export function CitySidebar({
         type="button"
         onClick={() => setCollapsed((v) => !v)}
         className={cn(
-          "fixed top-18 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground shadow-sm transition-all duration-300 hover:text-foreground",
+          "fixed top-18 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-md transition-all duration-300 hover:text-foreground",
           // Mobile: toggle stays at left edge
           // Desktop: follows sidebar edge
           collapsed
@@ -91,7 +91,7 @@ export function CitySidebar({
         aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
       >
         {collapsed ? (
-          <ChevronRight className="h-5 w-5" />
+          <Menu className="h-5 w-5" />
         ) : (
           <ChevronLeft className="h-5 w-5" />
         )}

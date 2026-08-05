@@ -42,6 +42,9 @@ export function PhotoGrid({
   // ── Lightbox state ────────────────────────────
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
+  // Save the gallery URL (with active filter) before the lightbox rewrites
+  // history, so closing restores it instead of dumping to "/".
+  const galleryUrlRef = useRef<string | null>(null);
 
   // ── Share dialog state ─────────────────────────
   const [sharePhotoId, setSharePhotoId] = useState<string | null>(null);
@@ -54,6 +57,11 @@ export function PhotoGrid({
   // Sync URL when lightbox opens AND handle browser back/forward
   useEffect(() => {
     if (open && photos[index]?.slug) {
+      // Capture the pre-lightbox URL once — only if we're not already on a
+      // photo page (opening from the gallery keeps any city/category filter).
+      if (!window.location.pathname.startsWith("/photo/") && !galleryUrlRef.current) {
+        galleryUrlRef.current = window.location.href;
+      }
       const target = `/photo/${photos[index].slug}`;
       window.history.replaceState({ lightboxIndex: index }, "", target);
     }
@@ -182,7 +190,9 @@ export function PhotoGrid({
         index={index}
         onClose={() => {
           setOpen(false);
-          window.history.replaceState(null, "", "/");
+          const prev = galleryUrlRef.current ?? "/";
+          galleryUrlRef.current = null;
+          window.history.replaceState(null, "", prev);
         }}
         onIndexChange={setIndex}
         onShare={handleShare}

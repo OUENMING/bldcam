@@ -28,6 +28,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const next: Theme = prev === "dark" ? "light" : "dark";
       localStorage.setItem(STORAGE_KEY, next);
       document.documentElement.classList.toggle(DARK_CLASS, next === "dark");
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", next === "dark" ? "#0c0a08" : "#faf8f5");
       return next;
     });
   };

@@ -90,7 +90,8 @@ export default async function HomePage({ searchParams }: PageProps) {
       </Suspense>
 
       {/* ── Right content ─────────────────────────── */}
-      <main className="flex-1 px-4 py-8 md:px-6 md:py-12">
+      <main id="main" className="flex-1 px-4 py-8 md:px-6 md:py-12">
+        <h1 className="sr-only">BLDcam — 星空摄影作品集</h1>
         {initialPhotos.length === 0 ? (
           <div className="flex min-h-[60vh] items-center justify-center">
             <div className="text-center space-y-2">

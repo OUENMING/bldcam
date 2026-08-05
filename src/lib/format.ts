@@ -91,3 +91,98 @@ export function formatGps(lat: number | null, lng: number | null): string {
   const lngDir = lng >= 0 ? "E" : "W";
   return `${Math.abs(lat).toFixed(4)}°${latDir}  ${Math.abs(lng).toFixed(4)}°${lngDir}`;
 }
+
+// ═══════════════════════════════════════════════════════════
+// CAMERA BRAND / MODEL — display cleanup
+//   Moved here from share.ts so the detail page + lightbox reuse
+//   the same friendly names the share card already uses.
+//   Pure string functions — no sharp/fs dependency (bundle-safe).
+// ═══════════════════════════════════════════════════════════
+
+const BRAND_DISPLAY: Record<string, string> = {
+  NIKON: "Nikon",
+  "NIKON CORPORATION": "Nikon",
+  NIKONCORPORATION: "Nikon",
+  SONY: "Sony",
+  CANON: "Canon",
+  FUJIFILM: "FUJIFILM",
+  LEICA: "Leica",
+  "LEICA CAMERA AG": "Leica",
+  Panasonic: "Panasonic",
+  OLYMPUS: "Olympus",
+  "OLYMPUS CORPORATION": "Olympus",
+  PENTAX: "Pentax",
+  RICOH: "Ricoh",
+  HASSELBLAD: "Hasselblad",
+  Apple: "Apple",
+  SAMSUNG: "Samsung",
+  Google: "Google",
+  DJI: "DJI",
+  GoPro: "GoPro",
+};
+
+/** Pretty-print a camera make ("NIKON CORPORATION" → "Nikon"). */
+export function brandDisplayName(make: string | null): string | null {
+  if (!make) return null;
+  const trimmed = make.trim();
+  return BRAND_DISPLAY[trimmed] ?? trimmed;
+}
+
+/** Strip the brand prefix from a model string. */
+export function cleanModel(
+  model: string | null,
+  make: string | null,
+  displayBrand: string | null,
+): string | null {
+  if (!model) return null;
+  let m = model.trim();
+  if (make) {
+    const raw = make.trim();
+    // Try stripping the full make string first (e.g. "NIKON CORPORATION")
+    m = m.replace(new RegExp(`^${escRegex(raw)}\\s*`, "i"), "").trim();
+    // Then try the first word of make (e.g. "NIKON")
+    const firstWord = raw.split(/\s+/)[0];
+    if (firstWord) {
+      m = m.replace(new RegExp(`^${escRegex(firstWord)}\\s*`, "i"), "").trim();
+    }
+    // Then try the display brand name (e.g. "Nikon")
+    if (displayBrand) {
+      m = m.replace(new RegExp(`^${escRegex(displayBrand)}\\s*`, "i"), "").trim();
+    }
+  }
+  return m || null;
+}
+
+/** Escape string for use in RegExp constructor. */
+export function escRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Underscore-encoded Roman numerals in Nikon models ("Z 6_2" → "Z 6 II")
+const ROMAN: Record<string, string> = {
+  "1": "I", "2": "II", "3": "III", "4": "IV", "5": "V",
+  "6": "VI", "7": "VII", "8": "VIII", "9": "IX", "10": "X",
+};
+
+// Phone/consumer lines whose model already names the product —
+// prepending the make ("Apple iPhone 14") is redundant noise.
+const SELF_DESCRIBING_MODELS = [
+  "iPhone", "iPad", "Pixel", "Galaxy", "Xiaomi", "Redmi", "Poco", "Huawei", "Honor",
+];
+
+/**
+ * Format a camera make+model for the "相机" line.
+ * "NIKON CORPORATION" + "NIKON Z 6_2" → "Nikon Z 6 II"
+ * "Apple" + "iPhone 14" → "iPhone 14"
+ */
+export function formatCamera(
+  make: string | null,
+  model: string | null,
+): string {
+  const brand = brandDisplayName(make);
+  let m = cleanModel(model, make, brand) ?? "";
+  m = m.replace(/_(\d)/g, (_all, d: string) => ` ${ROMAN[d] ?? d}`);
+  if (!brand) return m;
+  if (SELF_DESCRIBING_MODELS.some((p) => m.startsWith(p))) return m;
+  return [brand, m].filter(Boolean).join(" ");
+}

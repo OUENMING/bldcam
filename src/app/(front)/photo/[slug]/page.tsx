@@ -2,8 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { formatDate, formatExifLine, formatLocation } from "@/lib/format";
+import { formatCamera, formatDate, formatExifLine, formatLocation } from "@/lib/format";
 import { PhotoActions } from "@/components/gallery/photo-actions";
 
 interface Props {
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = [
     photo.title,
     photo.city && `摄于 ${photo.city}`,
-    photo.make && photo.model && `${photo.make} ${photo.model}`,
+    photo.make && photo.model && formatCamera(photo.make, photo.model),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -50,7 +51,7 @@ export default async function PhotoDetailPage({ params }: Props) {
 
   const location = formatLocation(photo);
 
-  const camera = [photo.make, photo.model].filter(Boolean).join(" ");
+  const camera = formatCamera(photo.make, photo.model);
   const exif = formatExifLine(photo);
 
   return (
@@ -151,7 +152,8 @@ export default async function PhotoDetailPage({ params }: Props) {
 
         {location && (
           <p className="text-muted-foreground text-sm">
-            📍 <span className="text-foreground/60">{location}</span>
+            <MapPin className="inline h-4 w-4 -translate-y-px text-muted-foreground" />
+            <span className="text-foreground/60">{location}</span>
           </p>
         )}
 

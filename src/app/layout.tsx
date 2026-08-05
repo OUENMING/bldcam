@@ -71,9 +71,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <meta name="theme-color" content="#0c0a08" />
+        <link rel="preconnect" href="https://cdn.bldcam.page" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("bldcam-theme")||"dark";if(t==="dark")document.documentElement.classList.add("dark")}catch(e){}`,
+            __html: `try{var t=localStorage.getItem("bldcam-theme")||"dark";var d=t==="dark";if(d)document.documentElement.classList.add("dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",d?"#0c0a08":"#faf8f5")}catch(e){}`,
           }}
         />
       </head>

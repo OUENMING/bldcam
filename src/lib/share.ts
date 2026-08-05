@@ -2,6 +2,7 @@ import sharp from "sharp";
 import { readFile } from "fs/promises";
 import path from "path";
 import type { Photo } from "@prisma/client";
+import { brandDisplayName, cleanModel } from "@/lib/format";
 
 // ═══════════════════════════════════════════════════════════
 // THEME — canonical source of all visual parameters
@@ -156,38 +157,6 @@ interface ExifSegment {
 }
 
 // ═══════════════════════════════════════════════════════════
-// BRAND MAP — keep manufacturer identity, not raw EXIF string
-// ═══════════════════════════════════════════════════════════
-
-const BRAND_DISPLAY: Record<string, string> = {
-  NIKON: "Nikon",
-  "NIKON CORPORATION": "Nikon",
-  NIKONCORPORATION: "Nikon",
-  SONY: "Sony",
-  CANON: "Canon",
-  FUJIFILM: "FUJIFILM",
-  LEICA: "Leica",
-  "LEICA CAMERA AG": "Leica",
-  Panasonic: "Panasonic",
-  OLYMPUS: "Olympus",
-  "OLYMPUS CORPORATION": "Olympus",
-  PENTAX: "Pentax",
-  RICOH: "Ricoh",
-  HASSELBLAD: "Hasselblad",
-  Apple: "Apple",
-  SAMSUNG: "Samsung",
-  Google: "Google",
-  DJI: "DJI",
-  GoPro: "GoPro",
-};
-
-function brandDisplayName(make: string | null): string | null {
-  if (!make) return null;
-  const trimmed = make.trim();
-  return BRAND_DISPLAY[trimmed] ?? trimmed;
-}
-
-// ═══════════════════════════════════════════════════════════
 // LAYOUT ENGINE
 //   Input: photo width, photo height
 //   Output: Layout (canvasH is auto-computed from photo aspect)
@@ -306,35 +275,6 @@ function buildOverlaySvg(w: number, h: number, rgb: string, alpha: number): stri
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${w}" height="${h}" fill="rgba(${rgb},${alpha})"/>
   </svg>`;
-}
-
-/** EXIF text bar — clean two-line sans-serif layout.
- *  Line 1: BRAND (uppercase, heavy) + model (light, dimmed).
- *  Line 2: EXIF parameters (light, dimmed).
- *  Model is sanitised to remove redundant brand prefix. */
-function cleanModel(model: string | null, make: string | null, displayBrand: string | null): string | null {
-  if (!model) return null;
-  let m = model.trim();
-  if (make) {
-    const raw = make.trim();
-    // Try stripping the full make string first (e.g. "NIKON CORPORATION")
-    m = m.replace(new RegExp(`^${escRegex(raw)}\\s*`, "i"), "").trim();
-    // Then try the first word of make (e.g. "NIKON")
-    const firstWord = raw.split(/\s+/)[0];
-    if (firstWord) {
-      m = m.replace(new RegExp(`^${escRegex(firstWord)}\\s*`, "i"), "").trim();
-    }
-    // Then try the display brand name (e.g. "Nikon")
-    if (displayBrand) {
-      m = m.replace(new RegExp(`^${escRegex(displayBrand)}\\s*`, "i"), "").trim();
-    }
-  }
-  return m || null;
-}
-
-/** Escape string for use in RegExp constructor. */
-function escRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function buildExifTextSvg(

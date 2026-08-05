@@ -8,7 +8,7 @@ import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
 import { Download, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDate, formatExposureTime, formatGps, formatAperture, formatLocation } from "@/lib/format";
+import { formatCamera, formatDate, formatExposureTime, formatGps, formatAperture, formatLocation } from "@/lib/format";
 import type { Photo } from "@prisma/client";
 
 // ── Slide type — extend YARL's slide with our EXIF data ──
@@ -48,7 +48,7 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
   if (slide.make || slide.model)
     exifItems.push({
       label: "相机",
-      value: [slide.make, slide.model].filter(Boolean).join(" "),
+      value: formatCamera(slide.make, slide.model),
     });
   if (slide.lensModel)
     exifItems.push({ label: "镜头", value: slide.lensModel });

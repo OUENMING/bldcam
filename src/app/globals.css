@@ -86,6 +86,7 @@
 
 /* ── Golden Hour (default) ───────────────────── */
 .dark {
+  color-scheme: dark;
   --background: #0c0a08;
   --foreground: #f0e6d6;
   --card: #1a1714;
@@ -131,6 +132,7 @@
   }
   html {
     @apply font-sans;
+    color-scheme: light;
     scrollbar-gutter: stable;
   }
 }
@@ -138,4 +140,16 @@
 /* Override YARL no-scroll — prevent height:100% from causing vertical layout shift */
 .yarl__no_scroll {
   height: auto;
+}
+
+/* ── Reduced motion — collapse animation/transition to instant ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
