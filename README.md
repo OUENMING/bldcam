@@ -9,16 +9,16 @@
 
 ## 项目介绍
 
-BLDcam 是一个个人星空摄影作品集网站。围绕摄影作品展示、地点标记和 EXIF 数据可视化构建，没有 SaaS 化意图，专注做好一件事：把星空照片呈现好。
+个人星空摄影作品集，围绕作品展示、地点标记、EXIF 数据可视化构建。不做 SaaS，只做一件事：把星空照片呈现好。
 
 ### 核心功能
 
-- **摄影画廊** — 瀑布流布局展示星空摄影作品，支持分类和标签筛选
-- **夜间模式** — 默认暗色主题，星空专用的暖色高光替代蓝色调，视觉沉浸
-- **地图标记** — MapLibre 集成，每张照片标注拍摄地点，交互式地图浏览
+- **摄影画廊** — 瀑布流布局展示作品，支持分类和标签筛选
+- **双主题** — 默认暗色（星空专用暖色高光替代蓝色调），一键切亮色
+- **地图标记** — MapLibre 集成，每张照片标注拍摄地点，交互式浏览
 - **EXIF 数据** — 自动提取相机参数（ISO、快门、光圈、焦距、时间）
-- **双视图模式** — "沉浸"和"列表"两种浏览方式自由切换
-- **AI 描述** — 豆包视觉模型自动生成照片描述和拍摄故事
+- **双视图模式** — "沉浸" / "列表" 自由切换
+- **AI 标题/分类建议** — 上传时由豆包视觉模型（Volcengine Ark）给出标题与分类建议，手动触发、可改可不改
 - **管理后台** — 登录后可上传、编辑、管理照片（admin 路由）
 
 ### 适用场景
@@ -32,11 +32,11 @@ BLDcam 是一个个人星空摄影作品集网站。围绕摄影作品展示、�
 | 功能名称 | 功能说明 | 技术栈 | 更新时间 | 版本 |
 |---------|---------|--------|----------|------|
 | 摄影画廊 | 瀑布流布局展示 | React + Tailwind | 2026-07-04 | v1.0 |
-| 地图标记 | 照片拍摄地点标记 | MapLibre + Supercluster | 2026-07-04 | v1.0 |
+| 地图标记 | 照片拍摄地点标记（逐点渲染，无聚合） | MapLibre GL | 2026-07-04 | v1.0 |
 | EXIF 提取 | 自动读取相机参数 | exifr | 2026-07-04 | v1.0 |
-| 夜间模式 | 星空专用暗色主题 | React Context | 2026-07-04 | v1.0 |
+| 双主题 | 亮/暗切换，默认暗色 | React Context + localStorage | 2026-07-04 | v1.0 |
 | 双视图模式 | 沉浸/列表切换 | React Context | 2026-07-04 | v1.0 |
-| AI 描述 | 自动生成照片故事 | Gemini API | 2026-06-20 | v1.0 |
+| AI 标题/分类建议 | 上传时给出标题与分类建议（不含描述） | 豆包 Seed 2.0 / Volcengine Ark | 2026-06-20 | v1.0 |
 | 管理后台 | 照片上传/编辑/管理 | Next.js admin route | 2026-06-21 | v1.0 |
 | 图片存储 | Cloudflare R2 对象存储 | @aws-sdk/client-s3 | 2026-06-14 | v1.0 |
 | 分享图 | 经典 EXIF + 签名 SVG 双模板 | Sharp 服务端合成 | 2026-07-24 | v1.8 |
@@ -67,7 +67,7 @@ BLDcam 是一个个人星空摄影作品集网站。围绕摄影作品展示、�
     ├── Next.js (App Router)
     │   ├── (front)/     → 公开页面（画廊、地图、照片详情）
     │   ├── admin/       → 管理后台（需密码）
-    │   └── api/         → REST API（照片 CRUD、AI 描述）
+    │   └── api/         → REST API（照片 CRUD、AI 建议）
     │
     ├── Prisma → SQLite          ← 结构化数据
     ├── Cloudflare R2            ← 原始图片存储
@@ -89,22 +89,22 @@ camlife-lite/
 │   │   │   ├── auth/             # 登录/退出
 │   │   │   └── photos/           # CRUD + AI suggest
 │   │   ├── layout.tsx
-│   │   └── globals.css           # 暗色主题变量
+│   │   └── globals.css           # 亮/暗双主题变量
 │   ├── components/
 │   │   ├── admin/                # 上传队列 + 照片管理
 │   │   ├── gallery/              # 瀑布流卡片 + Feed 流 + 灯箱
 │   │   ├── layout/               # Header 胶囊栏 + 侧边栏
 │   │   └── ui/                   # shadcn 基础组件
 │   ├── context/                  # 视图模式（waterfall/feed）
-│   ├── features/map/             # MapLibre + Supercluster
+│   ├── features/map/             # MapLibre 地图（逐点 Marker，无聚合）
 │   ├── hooks/                    # 自定义 Hooks
 │   ├── lib/                      # AI、R2、auth、geocode、prisma、图片流水线
-│   └── types/                    # TypeScript 类型定义
 ├── prisma/
 │   └── schema.prisma             # Photo 模型
 ├── scripts/                      # 工具脚本
 ├── docs/                         # 项目文档
 ├── deploy-dist/                  # 部署产物
+├── ARCHITECTURE.md               # 架构审查（深/浅模块、seam、风险）
 ├── CLAUDE.md                     # AI 助手配置
 ├── deploy.sh                     # 一键部署脚本
 ├── vps-setup.sh                  # VPS 初始化
@@ -115,32 +115,32 @@ camlife-lite/
 
 ### 环境要求
 
-- Node.js >= 18
+- Node.js >= 20.9（Next.js 16 要求）
 - npm
 - Cloudflare R2 账号（图片存储）
-- 豆包/Volcengine Ark API Key（可选，用于 AI 描述）
+- 豆包/Volcengine Ark API Key（可选，用于 AI 标题/分类建议）
 
 ### 安装步骤
 
 ```bash
-# 克隆
+# 1. 克隆 + 安装
 git clone https://github.com/OUENMING/bldcam.git
 cd camlife-lite && npm install
 
-# 复制环境变量模板，填上密钥
-cp .env.example .env
-# 必填：R2_* 系列、ADMIN_PASSWORD
-# 可选：ARK_API_KEY（豆包 AI）
+# 2. 配置 .env（该文件不进版本库）
+touch .env
+# 必填：R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET / R2_ENDPOINT /
+#       R2_REGION / R2_PUBLIC_URL、ADMIN_PASSWORD、ADMIN_TOKEN
+# 可选：ARK_API_KEY、ARK_BASE_URL（豆包 AI 标题/分类建议）
 
-# 初始化数据库
+# 3. 初始化数据库
 npx prisma db push
 
-# 启动开发服务器
+# 4. 启动开发服务器
 npm run dev
 ```
 
-打开 http://localhost:3000 即可访问。
-后台在 http://localhost:3000/admin。
+打开 http://localhost:3000 访问；后台在 http://localhost:3000/admin。
 
 ## 使用说明
 
@@ -161,8 +161,14 @@ npm run build
 bash deploy.sh      # 一键推送到 VPS
 ```
 
-项目部署在 https://bldcam.page，使用 VPS + PM2 + Nginx 运行。
-图片经 Cloudflare R2 Custom Domain 提供：`cdn.bldcam.page` 在 R2 桶 `photosave` 的 **Settings → Custom Domains** 中连接，启用边缘缓存（对象带 `max-age=31536000, immutable`）。若分享图/图片变慢或"有时加载失败"，先查该连接是否还在、GET 响应头 `cf-cache-status` 是否为 `HIT`。
+项目部署在 https://bldcam.page，VPS + PM2 + Nginx 运行。
+
+图片经 Cloudflare R2 Custom Domain 提供：`cdn.bldcam.page` 挂在 R2 桶 `photosave` 的 **Settings → Custom Domains**，对象带 `max-age=31536000, immutable`，启用边缘缓存。
+
+分享图/图片变慢或"有时加载失败"时，依次查两处：
+
+1. 该 Custom Domain 连接是否还在
+2. GET 响应头 `cf-cache-status` 是否为 `HIT`
 
 ## 设计哲学
 
