@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Map, { Marker, Popup } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { formatAperture, formatLocation } from "@/lib/format";
+import { cityFilterHref } from "@/lib/utils";
 import type { Photo } from "@prisma/client";
 
 // ── Types ────────────────────────────────────────
@@ -48,7 +49,9 @@ function PhotoPopup({
     .filter(Boolean)
     .join(" · ");
 
-  const hasCity = !!photo.city;
+  // Narrowed once, so the action below needs no non-null assertion and no separate
+  // `hasCity` flag that could drift out of step with it.
+  const city = photo.city;
 
   return (
     <div className="w-64 rounded-xl border border-amber-600/30 bg-background p-3 shadow-[0_0_25px_-5px_rgba(217,119,6,0.15)]">
@@ -80,11 +83,13 @@ function PhotoPopup({
       {exif && <p className="mt-1 text-muted-foreground text-xs">{exif}</p>}
 
       {/* Action: go to city page */}
-      {hasCity && (
+      {city && (
         <button
           type="button"
           onClick={() => {
-            router.push(`/?city=${encodeURIComponent(photo.city!)}`);
+            // `city`, not `photo.city!` — the assertion hid the coupling that a
+            // separate flag used to carry.
+            router.push(cityFilterHref(city));
             onClose();
           }}
           className="mt-2 w-full rounded-lg border border-amber-900/50 bg-amber-950/30 py-1.5 text-amber-500 text-xs transition-colors hover:bg-amber-900/50"
@@ -110,19 +115,70 @@ export function PhotoMap({ photos }: PhotoMapProps) {
   const [hovered, setHovered] = useState<MapPhoto | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleMouseEnter = useCallback((photo: MapPhoto) => {
+  const clearTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    setHovered(photo);
+    timerRef.current = null;
   }, []);
 
+  // Every path that opens or closes the popup goes through one of these two, so a
+  // pending close scheduled by a mouseleave can never fire against a popup that was
+  // opened after it. That race was the "popup flashes and disappears" case: leaving
+  // the popup and clicking a marker within 250ms let the old timer null the new one.
+  const closePopup = useCallback(() => {
+    clearTimer();
+    setHovered(null);
+  }, [clearTimer]);
+
+  const handleMouseEnter = useCallback((photo: MapPhoto) => {
+    clearTimer();
+    setHovered(photo);
+  }, [clearTimer]);
+
   const handleMouseLeave = useCallback(() => {
+    clearTimer();
     timerRef.current = setTimeout(() => setHovered(null), 250);
-  }, []);
+  }, [clearTimer]);
 
   // Cleanup timer on unmount
   useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, []);
+    return clearTimer;
+  }, [clearTimer]);
+
+  // Built once per photo list rather than on every render. A `hovered` change
+  // re-renders PhotoMap, and rebuilding this array there meant constructing a
+  // <Marker> for every point each time the pointer moved — cost that scales with
+  // the number of pins, which is exactly when the map is already heaviest.
+  const markers = useMemo(
+    () =>
+      photos.map(
+        (photo) =>
+          photo.latitude != null &&
+          photo.longitude != null && (
+            <Marker
+              key={photo.id}
+              longitude={photo.longitude}
+              latitude={photo.latitude}
+              anchor="center"
+            >
+              <div
+                onMouseEnter={() => handleMouseEnter(photo)}
+                onMouseLeave={handleMouseLeave}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Toggle: tap same marker again to close. The timer is cleared
+                  // first so a close scheduled by a just-passed mouseleave cannot
+                  // fire 250ms later and blank the popup that this click opened.
+                  clearTimer();
+                  setHovered((prev) => (prev?.id === photo.id ? null : photo));
+                }}
+              >
+                <DotMarker />
+              </div>
+            </Marker>
+          ),
+      ),
+    [photos, handleMouseEnter, handleMouseLeave, clearTimer],
+  );
 
   return (
     <div
@@ -140,34 +196,9 @@ export function PhotoMap({ photos }: PhotoMapProps) {
         attributionControl={false}
         localIdeographFontFamily="'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif"
         style={{ width: "100%", height: "100%" }}
-        onClick={() => setHovered(null)}
+        onClick={closePopup}
       >
-        {photos.map(
-          (photo) =>
-            photo.latitude != null &&
-            photo.longitude != null && (
-              <Marker
-                key={photo.id}
-                longitude={photo.longitude}
-                latitude={photo.latitude}
-                anchor="center"
-              >
-                <div
-                  onMouseEnter={() => handleMouseEnter(photo)}
-                  onMouseLeave={handleMouseLeave}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Toggle: tap same marker again to close
-                    setHovered((prev) =>
-                      prev?.id === photo.id ? null : photo,
-                    );
-                  }}
-                >
-                  <DotMarker />
-                </div>
-              </Marker>
-            ),
-        )}
+        {markers}
 
         {hovered &&
           hovered.latitude != null &&
@@ -176,20 +207,18 @@ export function PhotoMap({ photos }: PhotoMapProps) {
               longitude={hovered.longitude}
               latitude={hovered.latitude}
               anchor="bottom"
-              onClose={() => setHovered(null)}
+              onClose={closePopup}
               closeButton={false}
               offset={16}
               className="[&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!p-0 [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-tip]:!hidden"
             >
               <div
-                onMouseEnter={() => {
-                  if (timerRef.current) clearTimeout(timerRef.current);
-                }}
+                onMouseEnter={clearTimer}
                 onMouseLeave={handleMouseLeave}
               >
                 <PhotoPopup
                   photo={hovered}
-                  onClose={() => setHovered(null)}
+                  onClose={closePopup}
                 />
               </div>
             </Popup>

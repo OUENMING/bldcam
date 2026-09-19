@@ -62,7 +62,15 @@ function uploadWithProgress(
 
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(JSON.parse(xhr.responseText));
+        // A gateway HTML error page, an empty 204 or a truncated body all arrive
+        // here. Without this guard the parse throws inside onload, nothing ever
+        // settles the promise, and the whole batch hangs on "上传中…" with the
+        // progress bar frozen.
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error("服务器返回了无法解析的响应"));
+        }
       } else {
         try {
           reject(new Error(JSON.parse(xhr.responseText).error));
@@ -78,7 +86,11 @@ function uploadWithProgress(
     // Wire AbortController → XHR
     if (signal) {
       const onAbort = () => { xhr.abort(); };
-      signal.addEventListener("abort", onAbort, { once: true });
+      signal.addEventListener("abort", onAbort);
+      // Detached on every settle path. `{ once: true }` only removes the listener
+      // when abort actually fires, so after a normal upload it stayed attached to
+      // the shared controller — one more closure and XHR retained per file.
+      xhr.onloadend = () => signal.removeEventListener("abort", onAbort);
     }
 
     xhr.send(formData);
@@ -134,11 +146,17 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  // Set false by the cleanup below. Nothing in this component stops a batch other
+  // than unmounting, so this is what separates "cancelled because the user left"
+  // from "a file failed" — the batch controller's signal cannot tell them apart.
+  const mountedRef = useRef(true);
 
   // Cleanup: abort in-flight uploads on unmount to prevent
   // state updates on unmounted component
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       abortRef.current?.abort();
     };
   }, []);
@@ -202,6 +220,9 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
       // Fire-and-forget AI (serial — one at a time to avoid rate limits)
       (async () => {
         for (const entry of entries) {
+          // The component can go away mid-batch; without this the loop keeps
+          // awaiting and calling setQueue on a component that is already gone.
+          if (!mountedRef.current) return;
           await suggestForEntry(entry.id, entry.file);
         }
       })();
@@ -281,6 +302,10 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
         uploaded.push(photo);
         successCount++;
       } catch (err) {
+        // The signal is the authority on whether this was a cancellation. Matching
+        // the XHR's "Aborted" message was fragile, and it also marked the cancelled
+        // entry as a failure and counted it before breaking out.
+        if (controller.signal.aborted) break;
         const message = err instanceof Error ? err.message : "上传失败";
         setQueue((prev) =>
           prev.map((e) =>
@@ -290,9 +315,13 @@ export function UploadZone({ onPhotosUploaded }: UploadZoneProps) {
           ),
         );
         failCount++;
-        if (err instanceof Error && err.message === "Aborted") break;
       }
     }
+
+    // Unmounted mid-batch: the remaining updates have nowhere to land, and handing
+    // the parent a partial result from a batch nobody is watching is worse than
+    // saying nothing — the photos that did land are already in the database.
+    if (!mountedRef.current) return;
 
     setBatchUploading(false);
 

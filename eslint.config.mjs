@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Deploy output. Gitignored, but `npm run lint` lints the working tree, and
+    // these are copies of the project — including copies of each other.
+    "deploy-dist/**",
   ]),
 ]);
 

@@ -1,10 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  THEME_COLORS,
+  THEME_DARK_CLASS as DARK_CLASS,
+  THEME_STORAGE_KEY as STORAGE_KEY,
+} from "@/lib/theme-constants";
 
 type Theme = "light" | "dark";
-const STORAGE_KEY = "bldcam-theme";
-const DARK_CLASS = "dark";
 
 interface ThemeContextValue {
   theme: Theme;
@@ -14,24 +17,41 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Lazy initializer reads the class set by the FOUC blocking script —
-  // zero hydration mismatch. SSR falls back to "dark".
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof document !== "undefined") {
-      return document.documentElement.classList.contains(DARK_CLASS) ? "dark" : "light";
-    }
-    return "dark";
-  });
+  // Fixed initial value so the server HTML and the first client render agree. The
+  // FOUC script has already put the right class on <html>, so the paint is correct
+  // — this state only has to catch up. Reading the class during render made the
+  // client's first frame differ from the server's whenever the theme was light,
+  // which showed up as a hydration error in ThemeSwitcher's icon.
+  const [theme, setTheme] = useState<Theme>("dark");
+
+  // The FOUC script has already applied the right class; this brings React's view of
+  // it into step, once, after mount, and re-asserts the meta tag. If that script
+  // threw (localStorage blocked, CSP) the meta stayed on the server's dark default
+  // while the page rendered light — the browser chrome disagreed with the page.
+  useEffect(() => {
+    const current: Theme = document.documentElement.classList.contains(DARK_CLASS)
+      ? "dark"
+      : "light";
+    // Reading the class during render is exactly what mismatched the two sides.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTheme(current);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", THEME_COLORS[current]);
+  }, []);
 
   const toggle = () => {
-    setTheme((prev) => {
-      const next: Theme = prev === "dark" ? "light" : "dark";
+    // Side effects live outside the updater: StrictMode double-invokes updaters,
+    // which would toggle the class twice and land back on the original theme.
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    try {
       localStorage.setItem(STORAGE_KEY, next);
-      document.documentElement.classList.toggle(DARK_CLASS, next === "dark");
-      const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute("content", next === "dark" ? "#0c0a08" : "#faf8f5");
-      return next;
-    });
+    } catch {
+      // Storage unavailable (private mode, quota) — the state still flips.
+    }
+    document.documentElement.classList.toggle(DARK_CLASS, next === "dark");
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", THEME_COLORS[next]);
   };
 
   return (

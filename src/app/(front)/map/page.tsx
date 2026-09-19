@@ -3,13 +3,17 @@ import { PhotoMap } from "@/features/map/map-loader";
 
 export const dynamic = "force-dynamic";
 
+/** Pins drawn at once. Markers are not clustered, so this is also the point past
+ *  which the map starts to feel heavy. */
+const MAP_PIN_LIMIT = 200;
+
 export default async function MapPage() {
   const photos = await prisma.photo.findMany({
     where: {
       latitude: { not: null },
       longitude: { not: null },
     },
-    take: 200,
+    take: MAP_PIN_LIMIT,
     select: {
       id: true,
       title: true,

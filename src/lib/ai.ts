@@ -170,8 +170,6 @@ export async function suggestMetadata(
       signal: controller.signal,
     });
 
-    clearTimeout(timeout);
-
     if (!res.ok) {
       const errBody = await res.text().catch(() => "");
       console.warn(`Doubao HTTP ${res.status}:`, errBody.slice(0, 300));
@@ -233,8 +231,6 @@ export async function suggestMetadata(
     console.warn("Doubao could not extract title/category");
     return { suggestedTitle: null, suggestedCategory: null };
   } catch (error) {
-    clearTimeout(timeout);
-
     if (error instanceof Error) {
       if (error.name === "AbortError") {
         console.warn("Doubao timed out (20s)");
@@ -246,5 +242,11 @@ export async function suggestMetadata(
     }
 
     return { suggestedTitle: null, suggestedCategory: null };
+  } finally {
+    // In a finally so it covers the BODY read as well. Clearing it right after
+    // `await fetch` (the old placement) ended the timeout the moment the headers
+    // arrived, leaving `res.text()` / `res.json()` unbounded — a server that sends
+    // headers and then stalls hung the request indefinitely.
+    clearTimeout(timeout);
   }
 }

@@ -35,7 +35,7 @@
 | 技术栈与 Phase 4 要求 `Supercluster` / marker clustering | **未实现**：`supercluster` 只在 `package.json` 里声明，`src/` 全库零 import；`src/features/map/photo-map.tsx` 逐点渲染 `<Marker>`（上限 200），无聚合。照片变多时这是第一个会卡的地方 |
 | Image Processing 依赖 `blurhash`（Phase 2 也要求生成） | **依赖已移除**；LQIP 现由 `src/lib/image/blurhash.ts` 用 sharp 自产 16px base64 PNG —— 文件名有误导性 |
 | 架构描述见 `docs/architecture.md` | **该文件已过期且会带偏人**：它写「Auth: Simple JWT (jose)」「`src/types/photo.ts`」「blurhash 占位符」，实际是明文 cookie 比对（`src/lib/auth.ts`）、`src/types/` 目录**不存在**、blurhash 依赖已删。改读 `ARCHITECTURE.md` |
-| Authentication Strategy 一节：单 admin token | 方案本身仍成立（无 NextAuth / 无 session 库），但 **`.env` 的 `ADMIN_TOKEN` 至今仍是模板占位串，`isAdmin()` 就是 `cookie["admin-token"] === ADMIN_TOKEN` 的明文比较** —— 知道该串的人手设 cookie 即拿到全部管理权限（上传 / 删除 / 旋转 / 改标题）。且 `deploy.sh:21` 会把 `.env` 复制上路，默认串极可能就是线上生效的那一个。这是**现存的活体安全漏洞**，动手前先轮换成随机串，细节见 `ARCHITECTURE.md` 第 7.1 节 |
+| Authentication Strategy 一节：单 admin token | 方案本身不变（无 NextAuth / 无 session 库）。**2026-09-19 核实：原来记的"活体漏洞"已不存在** —— `ADMIN_TOKEN` 不是占位串（长度 32），`.env` 未被 git 跟踪，`deploy-dist/` 与 `.env.production` 都在 `.gitignore` 里。同日已改：cookie 比较走恒定时间的 `safeEqual`（两侧先 sha256 对齐长度再 `timingSafeEqual`）；配置缺失时登录返回 5xx，不再出现「提示成功但没写 cookie」。**仍未做**：token 不可撤销（轮换需重新部署）、登录无限流。细节见 `ARCHITECTURE.md` 第 7.1 节 |
 
 ---
 

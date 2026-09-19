@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, cityFilterHref } from "@/lib/utils";
 import {
   ChevronLeft,
   ChevronDown,
@@ -55,9 +55,25 @@ export function CitySidebar({
     }
   }, [activeCity, activeCategory]);
 
+  // Collapse when the viewport crosses into the mobile breakpoint. The state starts
+  // collapsed, which is what mobile wants, so only the transition needs handling —
+  // but it does need handling: resizing across 768px used to leave the sidebar in
+  // whichever state it was already in, and on mobile it is a full-height overlay
+  // that covers the page.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const onChange = () => {
+      if (mq.matches) setCollapsed(true);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   // ── Build link hrefs ─────────────────────────────
   function cityHref(city: string) {
-    return activeCity === city ? "/" : `/?city=${encodeURIComponent(city)}`;
+    // The active city already means "no filter", so it links home; otherwise use the
+    // shared builder the map popup also uses.
+    return activeCity === city ? "/" : cityFilterHref(city);
   }
   function categoryHref(cat: string) {
     return activeCategory === cat
@@ -102,7 +118,10 @@ export function CitySidebar({
         className={cn(
           "fixed inset-y-0 left-0 z-10 flex flex-col border-r border-border/50 bg-background/80 backdrop-blur-md transition-all duration-300 ease-out md:bg-background/80",
           // Mobile: overlay (no spacer), desktop: inline (with spacer)
-          collapsed ? "w-0 overflow-hidden border-0 opacity-0" : "w-56",
+          // `invisible` while collapsed, so the links inside leave the tab order
+          // and the hit-test area. The toggle button above is a real <button>
+          // with an aria-label, so keyboard users still have a way in.
+          collapsed ? "invisible w-0 overflow-hidden border-0 opacity-0" : "w-56",
         )}
       >
         {/* ── 全部照片 ───────────────────────────── */}

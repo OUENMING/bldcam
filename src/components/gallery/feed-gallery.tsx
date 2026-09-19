@@ -21,12 +21,14 @@ import type { Photo } from "@prisma/client";
 
 function FeedCard({
   photo,
+  index,
   priority,
-  onClick,
+  onOpen,
 }: {
   photo: Photo;
+  index: number;
   priority?: boolean;
-  onClick?: () => void;
+  onOpen?: (index: number) => void;
 }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const { ref, inView } = useInViewOnce();
@@ -54,7 +56,7 @@ function FeedCard({
           height: displaySize.height,
           maxWidth: "100%",
         }}
-        onClick={onClick}
+        onClick={() => onOpen?.(index)}
       >
         <Image
           fill
@@ -65,6 +67,9 @@ function FeedCard({
           priority={priority}
           draggable={false}
           onLoad={() => setIsLoaded(true)}
+          // Without this a failed request left isLoaded false forever: the image
+          // sat at opacity-0 and the user saw an empty frame with no error at all.
+          onError={() => setIsLoaded(true)}
           className={cn(
             "object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]",
             isLoaded ? "opacity-100" : "opacity-0",
@@ -111,8 +116,9 @@ export function FeedGallery({ photos, onPhotoClick }: FeedGalleryProps) {
         <MemoizedFeedCard
           key={photo.id}
           photo={photo}
+          index={i}
           priority={i < 3}
-          onClick={() => onPhotoClick(i)}
+          onOpen={onPhotoClick}
         />
       ))}
     </div>

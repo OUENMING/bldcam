@@ -14,7 +14,11 @@ export function LoginForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!password) return;
+    if (loading) return; // re-entry guard: Enter twice fired two requests
+    if (!password) {
+      toast.error("请输入密码");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -26,9 +30,16 @@ export function LoginForm() {
 
       if (res.ok) {
         toast.success("已登入");
+        // A refresh alone does not change the route, so a session already sitting on
+        // /admin stayed on the form with its auth state out of step.
+        router.replace("/admin");
         router.refresh();
-      } else {
+      } else if (res.status === 401 || res.status === 403) {
         toast.error("密码错误");
+      } else {
+        // A 500 or a throttled 429 is not a wrong password, and saying it is sends
+        // the user off to re-check something that was never wrong.
+        toast.error("登录失败，请稍后重试");
       }
     } catch {
       toast.error("网络错误");
@@ -48,8 +59,14 @@ export function LoginForm() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
+              id="admin-password"
               type="password"
               placeholder="Password"
+              // Without the id, the autocomplete hint and the accessible name, a
+              // screen reader announces an unlabelled field and password managers
+              // have nothing to key the saved credential on.
+              aria-label="管理员密码"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoFocus

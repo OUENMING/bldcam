@@ -21,6 +21,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Declared out here so the catch can roll them back: the uploads happen before
+  // the DB update, so a failed update would otherwise orphan both objects.
+  let newMainKey = "";
+  let newThumbKey = "";
+
   try {
     const { id, angle } = (await request.json()) as {
       id?: string;
@@ -74,9 +79,10 @@ export async function POST(request: NextRequest) {
     const oldKeys: string[] = [];
     const mainKey = extractKeyFromUrl(photo.url);
     if (mainKey) oldKeys.push(mainKey);
-    const thumbKey = photo.thumbnailUrl
-      ? extractKeyFromUrl(photo.thumbnailUrl)
-      : null;
+    const thumbKey =
+      newThumbBuf && photo.thumbnailUrl
+        ? extractKeyFromUrl(photo.thumbnailUrl)
+        : null;
     if (thumbKey) oldKeys.push(thumbKey);
 
     // ── Upload to new keys (bust CDN cache) ──────────
@@ -85,8 +91,8 @@ export async function POST(request: NextRequest) {
     const year = String(now.getFullYear());
     const month = String(now.getMonth() + 1).padStart(2, "0");
 
-    const newMainKey = `photos/${year}/${month}/${uuid}.webp`;
-    const newThumbKey = `thumbnails/${year}/${month}/${uuid}.webp`;
+    newMainKey = `photos/${year}/${month}/${uuid}.webp`;
+    newThumbKey = `thumbnails/${year}/${month}/${uuid}.webp`;
 
     const [newMainUrl, newThumbUrl] = await Promise.all([
       uploadToR2(newMainKey, rotatedMain, "image/webp"),
@@ -96,15 +102,16 @@ export async function POST(request: NextRequest) {
     ]);
 
     // ── Update DB ────────────────────────────────────
-    const swapsDimensions = normalized === 90 || normalized === 270;
+    // `rotatedMeta` is read from the already-rotated buffer, so newWidth/newHeight
+    // are the final dimensions. The old code swapped them again for 90/270, which
+    // stored the transposed pair and made the gallery lay the photo out sideways.
     const updated = await prisma.photo.update({
       where: { id },
       data: {
         url: newMainUrl,
         thumbnailUrl: newThumbUrl ?? photo.thumbnailUrl,
-        ...(swapsDimensions
-          ? { width: newHeight, height: newWidth }
-          : { width: newWidth, height: newHeight }),
+        width: newWidth,
+        height: newHeight,
       },
     });
 
@@ -118,6 +125,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Rotate failed:", error);
+    // Both objects were already written by the time this throws, and nothing will
+    // ever reference them. deleteFromR2 is a no-op on an empty array, so this needs
+    // no guard of its own.
+    try {
+      await deleteFromR2([newMainKey, newThumbKey]);
+    } catch (cleanupError) {
+      console.warn("Rotate: rollback of new keys failed:", cleanupError);
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

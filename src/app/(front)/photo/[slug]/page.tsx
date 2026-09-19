@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { MapPin } from "lucide-react";
@@ -11,11 +12,18 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+// generateMetadata and the page body need the same record, and the App Router runs
+// them as separate calls — without cache() the same slug was queried twice on every
+// page view. cache() dedupes within one request.
+const getPhotoBySlug = cache(async (slug: string) =>
+  prisma.photo.findUnique({ where: { slug } }),
+);
+
 // ── generateMetadata (SEO) ─────────────────────
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const photo = await prisma.photo.findUnique({ where: { slug } });
+  const photo = await getPhotoBySlug(slug);
 
   if (!photo) {
     return { title: "未找到照片 · BLDcam" };
@@ -45,7 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PhotoDetailPage({ params }: Props) {
   const { slug } = await params;
-  const photo = await prisma.photo.findUnique({ where: { slug } });
+  const photo = await getPhotoBySlug(slug);
 
   if (!photo) notFound();
 
@@ -92,7 +100,13 @@ export default async function PhotoDetailPage({ params }: Props) {
             dateCreated: photo.dateTimeOriginal?.toISOString(),
             author: { "@type": "Person", name: "菠萝丁 (Owen)" },
             url: `https://bldcam.page/photo/${photo.slug}`,
-          }),
+          })
+            // These fields come from the database — upload filenames, EXIF, AI text.
+            // A `</script>` in any of them would close the tag, and React does not
+            // escape what goes through dangerouslySetInnerHTML.
+            .replace(/</g, "\\u003c")
+            .replace(/>/g, "\\u003e")
+            .replace(/&/g, "\\u0026"),
         }}
       />
 
@@ -105,7 +119,9 @@ export default async function PhotoDetailPage({ params }: Props) {
           height={photo.height}
           priority
           blurDataURL={photo.blurDataUrl ?? undefined}
-          placeholder="blur"
+          // `placeholder="blur"` with no data URL throws inside next/image.
+          // blurDataUrl is nullable in the schema, so it decides the mode.
+          placeholder={photo.blurDataUrl ? "blur" : "empty"}
           className="h-auto w-full"
           sizes="(max-width: 768px) 100vw, 80vw"
         />

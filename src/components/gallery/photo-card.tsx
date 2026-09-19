@@ -12,11 +12,17 @@ import type { Photo } from "@prisma/client";
 
 interface PhotoCardProps {
   photo: Photo;
+  /**
+   * Position in the gallery. The card builds its own click handler from this plus
+   * a stable `onOpen`, instead of the parent handing it a fresh arrow every render
+   * — which is what made the memo below do nothing.
+   */
+  index: number;
   priority?: boolean;
-  onClick?: () => void;
+  onOpen?: (index: number) => void;
 }
 
-function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) {
+function PhotoCard({ photo, index, priority = false, onOpen }: PhotoCardProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const { ref, inView } = useInViewOnce();
   const exifLine = formatExifLine(photo);
@@ -38,7 +44,7 @@ function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) {
           "bg-muted shadow-md transition-shadow duration-500 ease-out",
           "hover:shadow-xl md:shadow-lg md:hover:shadow-2xl",
         )}
-        onClick={onClick}
+        onClick={() => onOpen?.(index)}
       >
         {/* ── Image ──────────────────────────────── */}
         <Image
@@ -51,6 +57,9 @@ function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) {
           priority={priority}
           draggable={false}
           onLoad={() => setIsLoaded(true)}
+          // A failed load left the card invisible rather than showing a broken or
+          // placeholder frame; reveal it either way.
+          onError={() => setIsLoaded(true)}
           className={cn(
             "h-auto w-full",
             "transition-transform duration-700 ease-out",
@@ -81,8 +90,16 @@ function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) {
           <h3
             className={cn(
               "font-semibold text-white text-lg leading-tight drop-shadow-md",
-              "translate-y-4 opacity-0",
-              "group-hover:translate-y-0 group-hover:opacity-100",
+              "translate-y-4 opacity-0 pointer-events-none",
+              // pointer-events, not `invisible`: this link is the only keyboard
+              // route into the card (the card itself is a div with onClick), so
+              // hiding it from the tab order would cost more than it fixes. On a
+              // touch screen there is no hover, so taps now fall through to the
+              // card and open the lightbox instead of jumping to the detail page.
+              "group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto",
+              // Tabbing to the link reveals the block, so the focus ring is on
+              // something visible (WCAG 2.4.7).
+              "focus-within:translate-y-0 focus-within:opacity-100 focus-within:pointer-events-auto",
               "transition-[opacity,transform] duration-500 ease-out",
             )}
           >
@@ -116,6 +133,15 @@ function PhotoCard({ photo, priority = false, onClick }: PhotoCardProps) {
   );
 }
 
-export const MemoizedPhotoCard = memo(PhotoCard, (prev, next) =>
-  prev.photo.id === next.photo.id && prev.priority === next.priority
+// onOpen is part of the comparison, so it has to be stable — the parent wraps it in
+// useCallback. Leaving it out (the previous behaviour) silently reused a stale
+// closure whenever the parent's handler changed.
+export const MemoizedPhotoCard = memo(
+  PhotoCard,
+  (prev, next) =>
+    prev.photo.id === next.photo.id &&
+    prev.photo === next.photo &&
+    prev.index === next.index &&
+    prev.priority === next.priority &&
+    prev.onOpen === next.onOpen,
 );

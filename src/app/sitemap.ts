@@ -22,12 +22,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  // Dynamic photo detail pages
-  const photos = await prisma.photo.findMany({
-    where: { slug: { not: null } },
-    select: { slug: true, updatedAt: true },
-    orderBy: { updatedAt: "desc" },
-  });
+  // Dynamic photo detail pages.
+  // A database hiccup used to turn the whole response into a 500, which reads to a
+  // crawler as the site being down. Serving the static routes is strictly better,
+  // and the protocol caps one sitemap file at 50,000 URLs anyway.
+  let photos: { slug: string | null; updatedAt: Date }[] = [];
+  try {
+    photos = await prisma.photo.findMany({
+      where: { slug: { not: null } },
+      select: { slug: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+      take: 50_000,
+    });
+  } catch (error) {
+    console.error("sitemap: photo query failed, serving static routes only:", error);
+  }
 
   const photoRoutes: MetadataRoute.Sitemap = photos.map((photo) => ({
     url: `${baseUrl}/photo/${photo.slug}`,

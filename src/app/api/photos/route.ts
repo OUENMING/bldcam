@@ -26,7 +26,12 @@ export async function GET(request: NextRequest) {
   // The frontend gallery uses it for infinite scroll.
 
   const { searchParams } = new URL(request.url);
-  const limit = Math.min(Number(searchParams.get("limit")) || 20, 50);
+  // Clamp both ends. `Math.min` alone let `?limit=-5` through, and Prisma reads a
+  // negative `take` as backwards pagination — the gallery came back in reverse. A
+  // fractional value (`?limit=2.5`) throws instead.
+  const rawLimit = Number(searchParams.get("limit"));
+  const limit =
+    Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 50) : 20;
   const cursor = searchParams.get("cursor") || undefined;
   const city = searchParams.get("city") || undefined;
   const category = searchParams.get("category") || undefined;
@@ -36,6 +41,9 @@ export async function GET(request: NextRequest) {
     : category ? { category }
     : {};
 
+  // A cursor that no longer resolves is not an error: Prisma returns zero rows, and
+  // `photos.length === limit` below is then false, so nextCursor comes back null and
+  // the client stops cleanly. (Verified against this schema — it does not throw.)
   const photos = await prisma.photo.findMany({
     where,
     orderBy: { createdAt: "desc" },
@@ -72,7 +80,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const title = (formData.get("title") as string)?.trim();
+    // A multipart field is a File when the same name repeats or the request is
+    // hand-built, and `(x as string).trim()` on one throws into the 500 handler.
+    const titleField = formData.get("title");
+    const title = typeof titleField === "string" ? titleField.trim() : "";
     if (!title) {
       return NextResponse.json(
         { error: "Title is required" },
@@ -164,11 +175,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     const data: Record<string, string> = {};
-    if (title !== undefined) {
-      data.title = title.trim();
-      data.slug = generateSlug(title.trim());
+    // `typeof` rather than `!== undefined`: a JSON body carrying a number or object
+    // reaches `.trim()` and throws. A non-string is simply not a field to update, so
+    // the request falls through to "No fields to update" instead of a 500.
+    if (typeof title === "string") {
+      const trimmed = title.trim();
+      data.title = trimmed;
+      data.slug = generateSlug(trimmed);
     }
-    if (description !== undefined) data.description = description.trim();
+    if (typeof description === "string") data.description = description.trim();
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
@@ -227,20 +242,21 @@ export async function DELETE(request: NextRequest) {
     keys.push(getShareKeyV2(id, "classic"));
     keys.push(getShareKeyV2(id, "signature"));
 
-    // ── Delete from R2 first (best-effort) ─────────
-    // It's OK if R2 delete partially fails — the DB record
-    // is the source of truth and the R2 objects are orphaned
-    // but not leaked in the app.
+    // ── Delete the DB record FIRST ──────────────────
+    // The record is the source of truth, so removing it first means a later R2
+    // failure leaves an unreferenced object — harmless. The old order did the
+    // reverse, and a failed `prisma.photo.delete` left a row pointing at an object
+    // that was already gone: a permanently broken image that could not self-heal.
+    await prisma.photo.delete({ where: { id } });
+
+    // ── Then clean up R2 (best-effort) ──────────────
     if (keys.length > 0) {
       try {
         await deleteFromR2(keys);
       } catch (r2Err) {
-        console.error("R2 delete failed (continuing with DB delete):", r2Err);
+        console.error("R2 cleanup failed after DB delete (objects orphaned):", r2Err);
       }
     }
-
-    // ── Delete from DB ─────────────────────────────
-    await prisma.photo.delete({ where: { id } });
 
     return NextResponse.json({ success: true, deletedKeys: keys.length });
   } catch (error) {

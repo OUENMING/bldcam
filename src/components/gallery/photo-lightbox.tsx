@@ -70,7 +70,7 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
       value: formatDate(new Date(slide.dateTimeOriginal)),
     });
   const gps =
-    slide.latitude && slide.longitude
+    slide.latitude != null && slide.longitude != null
       ? formatGps(slide.latitude, slide.longitude)
       : null;
 
@@ -89,6 +89,9 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
           priority
           unoptimized
           onLoad={() => setLoaded(true)}
+          // A failed load left the slide invisible rather than showing a broken or
+          // placeholder frame; reveal it either way.
+          onError={() => setLoaded(true)}
           className={cn(
             "max-h-[90svh] max-w-[90vw] object-contain",
             "transition-opacity duration-700 ease-out",
@@ -142,7 +145,10 @@ function CustomSlide({ slide }: { slide: ExifSlide }) {
 
 function LightboxDownloadButton() {
   const { slides, currentIndex } = useLightboxState();
-  const slide = slides[currentIndex] as unknown as ExifSlide;
+  const slide = slides[currentIndex] as unknown as ExifSlide | undefined;
+  // Same double assertion as the share button: it hides the out-of-range case
+  // rather than handling it, and `slide.id` below would throw.
+  if (!slide) return null;
 
   return (
     <a
@@ -163,7 +169,11 @@ function LightboxShareButton({
   onShare?: (photoId: string) => void;
 }) {
   const { slides, currentIndex } = useLightboxState();
-  const slide = slides[currentIndex] as unknown as ExifSlide;
+  const slide = slides[currentIndex] as unknown as ExifSlide | undefined;
+  // The double assertion above silences the type checker without proving anything:
+  // when the index is momentarily out of range this used to be undefined and
+  // `slide.id` below threw.
+  if (!slide) return null;
 
   return (
     <button

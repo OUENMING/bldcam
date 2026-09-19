@@ -6,9 +6,11 @@ export function formatExposureTime(seconds: number | null | undefined): string {
   if (!seconds || seconds <= 0) return "";
   if (seconds < 1) {
     const denominator = Math.round(1 / seconds);
-    return `1/${denominator}s`;
+    // Rounding collapses 0.7s to a denominator of 1, which would print "1/1s" —
+    // reading as a full second when it is not. Show the decimal instead.
+    if (denominator > 1) return `1/${denominator}s`;
+    return `${Number(seconds.toFixed(1))}s`;
   }
-  if (seconds === 1) return "1s";
   return `${seconds}s`;
 }
 
@@ -41,7 +43,15 @@ export function formatAperture(raw: number | null): string {
   const snapped = F_STOPS.reduce((best, stop) =>
     Math.abs(stop - raw) < Math.abs(best - raw) ? stop : best,
   );
-  const value = Math.abs(snapped - raw) < 0.15 ? snapped : Number(raw.toFixed(1));
+  // Snap only inside the table's own range. Its widest stop is f/1.0, so anything
+  // faster rounds *up* to it and destroys the one number worth knowing about such a
+  // lens — f/0.95 came out as "ƒ/1". Outside the range, report what the camera said,
+  // with a second decimal because 0.95 rounded to one decimal is 1.0 again.
+  const inRange = raw >= F_STOPS[0] && raw <= F_STOPS[F_STOPS.length - 1];
+  const value =
+    inRange && Math.abs(snapped - raw) < 0.15
+      ? snapped
+      : Number(raw.toFixed(raw < 1 ? 2 : 1));
   return `ƒ/${value}`;
 }
 
@@ -68,9 +78,14 @@ export function formatExifLine(photo: ExifPhotoLike): string {
   } else if (photo.focalLength != null) {
     parts.push(`${Math.round(photo.focalLength)}mm`);
   }
-  if (photo.fNumber != null) parts.push(formatAperture(photo.fNumber));
+  // Each formatter returns "" for a value it cannot render (a zero aperture, a
+  // non-positive shutter). Pushing that empty string left a stray " · " on the end.
+  const aperture = photo.fNumber != null ? formatAperture(photo.fNumber) : "";
+  if (aperture) parts.push(aperture);
   if (photo.iso != null) parts.push(`ISO ${photo.iso}`);
-  if (photo.exposureTime != null) parts.push(formatExposureTime(photo.exposureTime));
+  const shutter =
+    photo.exposureTime != null ? formatExposureTime(photo.exposureTime) : "";
+  if (shutter) parts.push(shutter);
   return parts.join(" · ");
 }
 
@@ -181,7 +196,10 @@ export function formatCamera(
 ): string {
   const brand = brandDisplayName(make);
   let m = cleanModel(model, make, brand) ?? "";
-  m = m.replace(/_(\d)/g, (_all, d: string) => ` ${ROMAN[d] ?? d}`);
+  // `_(\d+)`, not `_(\d)`: a single-digit capture ate only the "1" of Nikon's
+  // "_10" and left the "0" as literal text, rendering "Z 6 I0". It also made the
+  // "10": "X" entry in ROMAN unreachable.
+  m = m.replace(/_(\d+)/g, (_all, d: string) => ` ${ROMAN[d] ?? d}`);
   if (!brand) return m;
   if (SELF_DESCRIBING_MODELS.some((p) => m.startsWith(p))) return m;
   return [brand, m].filter(Boolean).join(" ");

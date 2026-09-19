@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -23,9 +24,16 @@ export function AdminConsole({ initialPhotos }: AdminConsoleProps) {
   const [activeSection, setActiveSection] = useState<"upload" | "list">("upload");
 
   const handleLogout = useCallback(async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    toast.success("已退出");
-    router.refresh();
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (!res.ok) throw new Error(`logout failed: ${res.status}`);
+      toast.success("已退出");
+      router.refresh();
+    } catch {
+      // Saying "已退出" after a failed call leaves the user believing they are
+      // signed out while the cookie is still live.
+      toast.error("退出失败，请重试");
+    }
   }, [router]);
 
   // Merge newly uploaded photos into the list
@@ -46,7 +54,7 @@ export function AdminConsole({ initialPhotos }: AdminConsoleProps) {
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
         {/* Left: Brand — always goes to front gallery */}
-        <a href="/" className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-2.5">
           <Aperture
             className="size-6 text-foreground"
             strokeWidth={2.25}
@@ -56,7 +64,7 @@ export function AdminConsole({ initialPhotos }: AdminConsoleProps) {
             <span className="font-bold tracking-widest text-foreground">BLD</span>
             <span className="font-normal italic tracking-wide text-primary">cam</span>
           </span>
-        </a>
+        </Link>
 
         {/* Right: Capsule bar */}
         <div className="flex items-center gap-x-3 rounded-full bg-card/60 px-4 py-2 backdrop-blur-md ring-1 ring-border/50">

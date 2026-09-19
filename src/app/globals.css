@@ -2,7 +2,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* `.dark *` alone only matched descendants, so a `dark:` utility on the element
+   that carries `.dark` itself — the <html> tag the FOUC script stamps — silently
+   did nothing. Adding `.dark` to the list is a strict superset, and :is() keeps
+   the specificity identical to before. */
+@custom-variant dark (&:is(.dark, .dark *));
 
 @theme inline {
   --color-background: var(--background);

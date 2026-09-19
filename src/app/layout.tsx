@@ -1,6 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Outfit, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/context/theme";
+import {
+  THEME_COLORS,
+  THEME_DARK_CLASS,
+  THEME_STORAGE_KEY,
+} from "@/lib/theme-constants";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -71,11 +76,17 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <meta name="theme-color" content="#0c0a08" />
+        <meta name="theme-color" content={THEME_COLORS.dark} />
         <link rel="preconnect" href="https://cdn.bldcam.page" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("bldcam-theme")||"dark";var d=t==="dark";if(d)document.documentElement.classList.add("dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",d?"#0c0a08":"#faf8f5")}catch(e){}`,
+            // Values interpolated from the shared module so this script, the meta
+            // above and ThemeProvider cannot drift apart.
+            __html:
+              `try{var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)})||"dark";` +
+              `var d=t==="dark";if(d)document.documentElement.classList.add(${JSON.stringify(THEME_DARK_CLASS)});` +
+              `var m=document.querySelector('meta[name="theme-color"]');` +
+              `if(m)m.setAttribute("content",d?${JSON.stringify(THEME_COLORS.dark)}:${JSON.stringify(THEME_COLORS.light)})}catch(e){}`,
           }}
         />
       </head>

@@ -43,6 +43,7 @@
 | 分享图 UI | 弹窗预览 + 模板切换 | shadcn Dialog + YARL portal | 2026-07-26 | v2.0 |
 | 原图下载 | WebP→PNG 转码下载 | Sharp 服务端转码 | 2026-08-06 | v2.0.1 |
 | 分享图稳定性 | 已缓存直接返回 PNG + CDN 边缘缓存 | R2 Custom Domain + 服务端代理 | 2026-08-06 | v2.0.1 |
+| 上传/下载上限 | 上传 ≤20MB 且限图片 MIME；下载源图 ≤30MB、解码 ≤5000 万像素 | 服务端校验 + sharp `limitInputPixels` | 2026-09-19 | v2.1 |
 
 ## 技术栈
 
@@ -126,6 +127,8 @@ camlife-lite/
 # 1. 克隆 + 安装
 git clone https://github.com/OUENMING/bldcam.git
 cd camlife-lite && npm install
+#     postinstall 会自动执行 prisma generate，生成 @prisma/client
+#     （缺这一步时运行期会报 "@prisma/client did not initialize yet"）
 
 # 2. 配置 .env（该文件不进版本库）
 touch .env
@@ -184,6 +187,9 @@ bash deploy.sh      # 一键推送到 VPS
 4. **rsync `--delete` 把数据库清了** — 必须加 `--exclude='dev.db'`
 5. **分享图已缓存返回 JSON 的坑** — 前端 `fetch` 默认 `Accept: */*`，API 若对非 `image/*` 返回 JSON，前端 `blob.type` 判断会抛 "Not an image" 显示"生成失败"。修复：已缓存时服务端代理返回真 PNG（image 客户端仍走 307 直连）
 6. **R2 的 HEAD 请求恒返回 `cf-cache-status: DYNAMIC`** — 测 R2/CDN 缓存必须用 GET，用 `curl -I` 会被误导；且 R2/CDN 无 CORS 头时，前端 fetch 不能跟随跨域 307，只能服务端代理或用 `<img>` 直载
+7. **`sharp().resize(16)` 只固定宽度** — 高度按比例自适应，1×20000 这种极端长宽比会生成 16×320000 的图，PNG 体积与内存都会爆。LQIP 用 `resize(16, 16, { fit: "inside" })` 框住两边
+8. **`DeleteObjectsCommand` 的 `Quiet: true` 会吞掉部分失败** — 该模式下成功项不回，失败项只出现在响应的 `Errors` 数组里；不读它，删除失败和成功长得一模一样。另外单次上限 1000 个 key，超出整体报错，要分批
+9. **`R2_PUBLIC_URL` 默认空串，`url.startsWith("")` 恒为 true** — 用它做前缀判断前必须先确认非空，否则整个 URL（含协议域名）都会被当成对象 key
 
 ## 项目总结
 

@@ -29,15 +29,23 @@ function getR2Client(): S3Client {
   return _r2Client;
 }
 
-export const R2_BUCKET = process.env.R2_BUCKET || "camlife";
-export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
+// Read from env per call rather than at module load. As module-level constants these
+// froze whatever was set at import time, so a test or an invocation that injects env
+// later silently kept the defaults.
+function r2Bucket(): string {
+  return process.env.R2_BUCKET || "camlife";
+}
+
+function r2PublicUrl(): string {
+  return process.env.R2_PUBLIC_URL || "";
+}
 
 /**
  * Public URL for a stored object.
  * No CDN abstraction — just base URL + key.
  */
 export function getPublicUrl(key: string): string {
-  return `${R2_PUBLIC_URL}/${key}`;
+  return `${r2PublicUrl()}/${key}`;
 }
 
 /**
@@ -49,15 +57,21 @@ export async function uploadToR2(
   buffer: Buffer,
   contentType: string,
 ): Promise<string> {
-  await getR2Client().send(
-    new PutObjectCommand({
-      Bucket: R2_BUCKET,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-      CacheControl: "public, max-age=31536000, immutable",
-    }),
-  );
+  try {
+    await getR2Client().send(
+      new PutObjectCommand({
+        Bucket: r2Bucket(),
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        CacheControl: "public, max-age=31536000, immutable",
+      }),
+    );
+  } catch (error) {
+    // The SDK's message says nothing about which object failed, and in a 200-file
+    // pipeline "AccessDenied" alone is not actionable. `cause` keeps the original.
+    throw new Error(`R2 upload failed for ${key} (${contentType})`, { cause: error });
+  }
   return getPublicUrl(key);
 }
 
@@ -65,18 +79,26 @@ export async function uploadToR2(
  * Batch-delete objects from R2.
  * Accepts an array of keys. Empty array is a no-op.
  */
+const DELETE_BATCH_SIZE = 1000;
 export async function deleteFromR2(keys: string[]): Promise<void> {
   if (keys.length === 0) return;
 
-  await getR2Client().send(
-    new DeleteObjectsCommand({
-      Bucket: R2_BUCKET,
-      Delete: {
-        Objects: keys.map((key) => ({ Key: key })),
-        Quiet: true,
-      },
-    }),
-  );
+  // S3 rejects a DeleteObjects call carrying more than 1000 keys.
+  for (let i = 0; i < keys.length; i += DELETE_BATCH_SIZE) {
+    const batch = keys.slice(i, i + DELETE_BATCH_SIZE);
+    // Quiet:false on purpose. With Quiet on, the only sign a key survived is the
+    // Errors array — which nothing read, so a failed delete looked exactly like a
+    // successful one and objects stayed in the bucket.
+    const res = await getR2Client().send(
+      new DeleteObjectsCommand({
+        Bucket: r2Bucket(),
+        Delete: { Objects: batch.map((key) => ({ Key: key })), Quiet: false },
+      }),
+    );
+    for (const err of res.Errors ?? []) {
+      console.warn(`deleteFromR2: ${err.Key} not deleted — ${err.Code ?? ""} ${err.Message ?? ""}`);
+    }
+  }
 }
 
 /**
@@ -94,15 +116,18 @@ export function getShareKeyV2(photoId: string, template: string = "classic"): st
  *   → "photos/2026/06/uuid.webp"
  */
 export function extractKeyFromUrl(url: string): string | null {
-  // Try current CDN domain first, then R2's default public host
-  const parts =
-    url.startsWith(R2_PUBLIC_URL)
-      ? [R2_PUBLIC_URL]
-      : url.match(/^https:\/\/[a-zA-Z0-9-]+\.r2\.dev/)?.[0]
-        ? [url.match(/^https:\/\/[a-zA-Z0-9-]+\.r2\.dev/)![0]]
-        : null;
+  // `r2PublicUrl()` defaults to "" and every string starts with "" — without this
+  // check the whole URL (protocol and host included) was returned as the key.
+  const base = r2PublicUrl();
+  if (base && url.startsWith(base)) {
+    return stripLeadingSlash(url.slice(base.length));
+  }
+  // R2's default public host, e.g. https://pub-xxx.r2.dev/photos/2026/06/uuid.webp
+  const m = url.match(/^https:\/\/[a-zA-Z0-9-]+\.r2\.dev/);
+  if (!m) return null;
+  return stripLeadingSlash(url.slice(m[0].length));
+}
 
-  if (!parts) return null;
-  const key = url.slice(parts[0].length);
-  return key.startsWith("/") ? key.slice(1) : key;
+function stripLeadingSlash(s: string): string {
+  return s.startsWith("/") ? s.slice(1) : s;
 }

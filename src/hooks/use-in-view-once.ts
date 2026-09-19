@@ -22,7 +22,17 @@ export function useInViewOnce(): {
   }, []);
 
   const ref = useCallback((el: HTMLElement | null) => {
-    if (!el || firedRef.current) return;
+    // React calls this with null when the node unmounts or rebinds. The previous
+    // observer has to be dropped or it stays registered on a detached element
+    // until the component unmounts.
+    if (!el || firedRef.current) {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+      return;
+    }
+    // A rebind can hand us a different element; disconnect first, since nothing
+    // else holds a reference to the old observer.
+    observerRef.current?.disconnect();
 
     const obs = new IntersectionObserver(
       ([entry]) => {

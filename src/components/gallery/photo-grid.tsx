@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useInView } from "react-intersection-observer";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { Photo } from "@prisma/client";
 import { useViewMode } from "@/context/view-mode";
 import { MemoizedPhotoCard } from "./photo-card";
@@ -38,6 +39,7 @@ export function PhotoGrid({
       : null,
   );
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   // ── Lightbox state ────────────────────────────
   const [open, setOpen] = useState(false);
@@ -54,25 +56,35 @@ export function PhotoGrid({
   const photosRef = useRef(photos);
   photosRef.current = photos;
 
-  // Sync URL when lightbox opens AND handle browser back/forward
+  // Sync URL when the lightbox opens
   useEffect(() => {
-    if (open && photos[index]?.slug) {
-      // Capture the pre-lightbox URL once — only if we're not already on a
-      // photo page (opening from the gallery keeps any city/category filter).
-      if (!window.location.pathname.startsWith("/photo/") && !galleryUrlRef.current) {
-        galleryUrlRef.current = window.location.href;
-      }
-      const target = `/photo/${photos[index].slug}`;
-      window.history.replaceState({ lightboxIndex: index }, "", target);
+    if (!open) return;
+    // Capture the pre-lightbox URL once, even when this photo has no slug. The
+    // close handler restores from this either way, and skipping the capture meant
+    // closing replaced the URL with "/" and dropped the active city/category filter.
+    if (!window.location.pathname.startsWith("/photo/") && !galleryUrlRef.current) {
+      galleryUrlRef.current = window.location.href;
     }
+    const slug = photos[index]?.slug;
+    if (slug) {
+      window.history.replaceState({ lightboxIndex: index }, "", `/photo/${slug}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, index, photos[index]?.slug]);
 
+  // Registered once. It used to live in the effect above, so every step through the
+  // gallery tore the listener down and added it again.
+  useEffect(() => {
     const onPop = () => {
-      // Browser back/forward → close the lightbox
+      // Browser back/forward closes the lightbox. Clear the captured URL too:
+      // leaving it set made the next open skip the capture and then restore a URL
+      // from before the previous session.
+      galleryUrlRef.current = null;
       setOpen(false);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [open, index, photos[index]?.slug]);
+  }, []);
 
   const { mode } = useViewMode();
 
@@ -110,6 +122,11 @@ export function PhotoGrid({
       setCursor(data.nextCursor);
     } catch (err) {
       console.error("Failed to fetch more photos:", err);
+      // Stop the sentinel from re-firing. Leaving hasMore true with inView still
+      // true made the effect below call fetchMore again the moment `loading` went
+      // back to false, so a persistent 5xx turned into a request storm against
+      // our own API.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -123,14 +140,21 @@ export function PhotoGrid({
   });
 
   useEffect(() => {
-    if (inView && hasMore && !loading) {
+    if (inView && hasMore && !loading && !loadError) {
       fetchMore();
     }
-  }, [inView, hasMore, loading, fetchMore]);
+  }, [inView, hasMore, loading, loadError, fetchMore]);
 
   // ═══════════════════════════════════════════════
   // Render
   // ═══════════════════════════════════════════════
+
+  // Stable identity, so the memo on each card actually holds: an inline arrow here
+  // was a new function on every render, and the cards are what the memo is for.
+  const openPhoto = useCallback((i: number) => {
+    setIndex(i);
+    setOpen(true);
+  }, []);
 
   return (
     <>
@@ -141,11 +165,9 @@ export function PhotoGrid({
             <MemoizedPhotoCard
               key={photo.id}
               photo={photo}
+              index={i}
               priority={i < 2}
-              onClick={() => {
-                setIndex(i);
-                setOpen(true);
-              }}
+              onOpen={openPhoto}
             />
           ))}
         </div>
@@ -153,13 +175,7 @@ export function PhotoGrid({
 
       {/* ── Feed ───────────────────────────────── */}
       {mode === "feed" && (
-        <FeedGallery
-          photos={photos}
-          onPhotoClick={(i) => {
-            setIndex(i);
-            setOpen(true);
-          }}
-        />
+        <FeedGallery photos={photos} onPhotoClick={openPhoto} />
       )}
 
       {/* ── Sentinel + loading / end indicator ──── */}
@@ -172,6 +188,17 @@ export function PhotoGrid({
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm">加载中…</span>
           </div>
+        )}
+
+        {loadError && !loading && (
+          <Button
+            variant="link"
+            size="sm"
+            onClick={() => setLoadError(false)}
+            className="text-muted-foreground"
+          >
+            加载失败，点击重试
+          </Button>
         )}
 
         {!hasMore && loadedCount > 0 && !loading && (

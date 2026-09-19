@@ -66,8 +66,11 @@ export function useImageDisplaySize(
 ) {
   const { maxHeightRatio } = options;
 
-  // Initialise synchronously from window.innerWidth/Height — no CLS
-  const [viewport, setViewport] = useState(getViewport);
+  // Starts unmeasured so the server and the first client render agree: getViewport
+  // touches window and returns the real size on the client, so initialising from it
+  // made the two disagree. The effect below syncs it right after mount, and every
+  // consumer already falls back to 1920×1080 while width/height are 0.
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
   // Subscribe to the singleton resize listener
   useEffect(() => {
@@ -86,9 +89,17 @@ export function useImageDisplaySize(
 
     // ── Responsive height ratio ─────────────────
     // If caller overrides, use that; otherwise pick by viewport width
+    // `??` only falls back on null/undefined, so a caller passing 0 produced a
+    // maxHeight of 0 and a size of {0,0}. Anything outside (0, 1] is not a usable
+    // fraction of the viewport.
     const ratio =
-      maxHeightRatio ??
-      (vw < 640 ? 0.65 : vw < 1024 ? 0.72 : 0.80);
+      maxHeightRatio != null && maxHeightRatio > 0 && maxHeightRatio <= 1
+        ? maxHeightRatio
+        : vw < 640
+          ? 0.65
+          : vw < 1024
+            ? 0.72
+            : 0.8;
 
     // ── Max width: match our Tailwind container ─
     // w-[92%] → sm:w-[88%] → lg:max-w-4xl (896px)

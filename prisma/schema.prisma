@@ -58,4 +58,21 @@ model Photo {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // ── Indexes ──────────────────────────────────────────────────────────
+  // Every one of these backs a query that runs on page load. Without them SQLite
+  // scans the whole table and sorts in memory for each.
+  //
+  //   [createdAt]       list with no filter — the SSR first screen and the
+  //                     infinite-scroll endpoint, both `orderBy createdAt desc`
+  //   [city, createdAt]      `where { city }` + the same ordering, plus its count()
+  //   [category, createdAt]  `where { category }` + the same ordering, and the
+  //                          sidebar's `groupBy(["category"])`
+  //   [country, city]        the sidebar's `groupBy(["country", "city"])`
+  //   [dateTimeOriginal]     the map page: `orderBy dateTimeOriginal desc`, take 200
+  @@index([createdAt])
+  @@index([city, createdAt])
+  @@index([category, createdAt])
+  @@index([country, city])
+  @@index([dateTimeOriginal])
 }

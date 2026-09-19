@@ -8,6 +8,13 @@ export interface LocationData {
   placeFormatted: string | null;
 }
 
+// Named so changing a provider, the timeout or the language is one edit rather than
+// a hunt through two functions.
+const GEOCODE_TIMEOUT_MS = 5000;
+const BIGDATACLOUD_ENDPOINT = "https://api.bigdatacloud.net/data/reverse-geocode-client";
+const NOMINATIM_ENDPOINT = "https://nominatim.openstreetmap.org/reverse";
+const GEOCODE_LOCALITY_LANGUAGE = "zh";
+
 // ── Provider types ────────────────────────────────
 
 interface GeocodingProvider {
@@ -25,19 +32,16 @@ async function bigDataCloud(
   lat: number,
   lng: number,
 ): Promise<LocationData | null> {
+  // Declared outside the try so the finally can reach it.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEOCODE_TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    const url = new URL(
-      "https://api.bigdatacloud.net/data/reverse-geocode-client",
-    );
+    const url = new URL(BIGDATACLOUD_ENDPOINT);
     url.searchParams.set("latitude", String(lat));
     url.searchParams.set("longitude", String(lng));
-    url.searchParams.set("localityLanguage", "zh");
+    url.searchParams.set("localityLanguage", GEOCODE_LOCALITY_LANGUAGE);
 
     const res = await fetch(url.toString(), { signal: controller.signal });
-    clearTimeout(timeout);
 
     if (!res.ok) return null;
 
@@ -61,6 +65,10 @@ async function bigDataCloud(
     };
   } catch {
     return null;
+  } finally {
+    // In a finally so it covers the body read too — clearing it as soon as the
+    // headers arrived left `res.json()` unbounded.
+    clearTimeout(timeout);
   }
 }
 
@@ -74,17 +82,17 @@ async function nominatim(
   lat: number,
   lng: number,
 ): Promise<LocationData | null> {
+  // Declared outside the try so the finally can reach it.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEOCODE_TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    const url = new URL("https://nominatim.openstreetmap.org/reverse");
+    const url = new URL(NOMINATIM_ENDPOINT);
     url.searchParams.set("format", "json");
     url.searchParams.set("lat", String(lat));
     url.searchParams.set("lon", String(lng));
     url.searchParams.set("zoom", "10");
     url.searchParams.set("addressdetails", "1");
-    url.searchParams.set("accept-language", "zh");
+    url.searchParams.set("accept-language", GEOCODE_LOCALITY_LANGUAGE);
 
     const res = await fetch(url.toString(), {
       headers: {
@@ -92,8 +100,6 @@ async function nominatim(
       },
       signal: controller.signal,
     });
-
-    clearTimeout(timeout);
 
     if (!res.ok) return null;
 
@@ -116,6 +122,8 @@ async function nominatim(
     };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

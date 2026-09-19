@@ -7,11 +7,17 @@ VPS="ubuntu@43.131.13.220"
 PORT="2222"
 DIST="deploy-dist"
 
+# Remove the previous output BEFORE building. `output: 'standalone'` traces the
+# project root, so a deploy-dist still sitting there at build time gets copied into
+# the new standalone output — and then `cp -r .next/standalone/*` copies that into
+# the new deploy-dist. One extra nesting level per deploy; at 2026-09-19 it had
+# reached 32 levels and 263MB, nearly all of it previous deploys.
+rm -rf "$DIST"
+
 echo "🔨 Building..."
 npm run build
 
 echo "📦 Packaging standalone..."
-rm -rf "$DIST"
 mkdir -p "$DIST"
 cp -r .next/standalone/* "$DIST/"
 rsync -a --exclude='cache' --exclude='standalone/node_modules' .next/ "$DIST/.next/"

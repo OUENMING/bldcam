@@ -42,6 +42,9 @@ export function ShareDialog({
   // Core state: image + template are always set together and never stale
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [template, setTemplate] = useState<Template>("classic");
+  // `template` only moves on success, so a retry driven by it would re-request the
+  // last template that worked instead of the one the user actually asked for.
+  const [requestedTemplate, setRequestedTemplate] = useState<Template>("classic");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [fadeIn, setFadeIn] = useState(false);
 
@@ -68,11 +71,23 @@ export function ShareDialog({
     revoke(blobRef.current);
     blobRef.current = null;
     fetchShareImage("classic");
+
+    return () => {
+      // Bump the sequence so any in-flight result is dropped, and revoke here too:
+      // a fetch that resolves after unmount creates an object URL that nothing
+      // will ever release. Reading the refs at cleanup time (rather than capturing
+      // them when the effect ran) is the point — it is the current blob that leaks.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      seqRef.current++;
+      revoke(blobRef.current);
+      blobRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, photoId]);
 
   async function fetchShareImage(tpl: Template) {
     const seq = ++seqRef.current;
+    setRequestedTemplate(tpl);
 
     // Mark loading — but DON'T hide the existing image (stale-while-loading)
     const isSwitch = status === "ready" && shareUrl != null;
@@ -93,15 +108,12 @@ export function ShareDialog({
       if (seq !== seqRef.current) return;
       if (!blob.type.startsWith("image/")) throw new Error("Not an image");
 
+      // Nothing between the read above and here awaits, so the sequence cannot have
+      // moved. Creating the URL only after the last check removes the branch that
+      // used to sit here and could never be taken.
       const url = URL.createObjectURL(blob);
       revoke(blobRef.current);
       blobRef.current = url;
-
-      if (seq !== seqRef.current) {
-        revoke(url);
-        blobRef.current = null;
-        return;
-      }
 
       // Swap in the new image
       setShareUrl(url);
@@ -115,6 +127,12 @@ export function ShareDialog({
     } catch (err) {
       if (seq !== seqRef.current) return;
       console.error("ShareDialog: fetch failed", err);
+      // The preview is hidden and the download/copy buttons unmount on an error, so
+      // the previous object URL has no reader left — release it here rather than
+      // holding it until the next success or unmount.
+      revoke(blobRef.current);
+      blobRef.current = null;
+      setShareUrl(null);
       setStatus("error");
       setSwitching(false);
     }
@@ -216,7 +234,7 @@ export function ShareDialog({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => fetchShareImage(template)}
+                onClick={() => fetchShareImage(requestedTemplate)}
               >
                 重试
               </Button>

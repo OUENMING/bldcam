@@ -12,10 +12,12 @@ import { uploadToR2, getShareKeyV2, getPublicUrl } from "@/lib/r2";
 // Query parameters:
 //   template   — "classic" (default, brand+EXIF) or "signature" (SVG mark)
 //
-// Accept header:
-//   image/*      → returns PNG directly (200)
-//   text/html    → redirects to R2 URL (307)
-//   other/omitted → returns JSON { url } (200)
+// This route has exactly ONE response shape: 200 with image/png. It used to branch
+// on `Accept` and 307 to the R2 object for `image/*`, which made the body depend on
+// a header that says nothing about whether the client can follow a cross-origin
+// redirect — R2 sends no CORS headers, so a fetch cannot, and a shared cache could
+// replay a 307 to a client expecting bytes. Nothing internal relied on the redirect:
+// the og:image tags point straight at the R2 URL.
 // ═══════════════════════════════════════════════════════
 export async function GET(
   request: Request,
@@ -45,15 +47,8 @@ export async function GET(
     try {
       const head = await fetch(shareUrl, { method: "HEAD" });
       if (head.ok) {
-        // Image clients (og tags, <img>, direct links) → 307 straight to the CDN.
-        const accept = request.headers.get("accept") || "";
-        if (accept.startsWith("image/")) {
-          return NextResponse.redirect(shareUrl, 307);
-        }
-        // Everything else (ShareDialog fetch, browser tab) → proxy the cached
-        // PNG through the API so the body is always image/png. Returning JSON
-        // here made the frontend's fetch→blob→<img> throw "Not an image" and
-        // show 生成失败 on every already-cached share.
+        // Cached: proxy the PNG so every client gets the same shape, and the CDN
+        // caches the result of this route rather than only the object behind it.
         const img = await fetch(shareUrl, {
           signal: AbortSignal.timeout(15_000),
         });

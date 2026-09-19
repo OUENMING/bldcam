@@ -112,8 +112,21 @@ export const CLASSIC_THEME = {
 
   // ── Output ───────────────────────────────────────
   output: {
-    /** PNG compression quality 0-100 */
-    quality: 92,
+    /**
+     * zlib effort 0-9. Lossless either way — this only trades encode time for size.
+     *
+     * Deliberately NOT `quality`: on a PNG that option means "use the fewest colours
+     * that reach this quality", which switches the palette on and caps the image at
+     * 256 colours. On a photo composite that shows up as banding in the gradients.
+     * Measured: `quality: 92` with `palette: false` produced bytes identical to
+     * passing no options at all, so the old value was only ever doing the
+     * palettisation.
+     *
+     * And why 6 rather than 9: level 9 costs roughly 2-3× the zlib time to save
+     * 1-3% of bytes. R2 charges nothing for egress, so those bytes buy nothing,
+     * while the encode time is paid on every cache miss.
+     */
+    compressionLevel: 6,
   },
 } as const;
 
@@ -517,7 +530,7 @@ async function renderComposite(
 
   return sharp(background)
     .composite(layers)
-    .png({ quality: theme.output.quality })
+    .png({ compressionLevel: theme.output.compressionLevel })
     .toBuffer();
 }
 

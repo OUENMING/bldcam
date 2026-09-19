@@ -49,26 +49,47 @@ export async function pipeline(buffer: Buffer): Promise<PipelineResult> {
   const photoKey = `photos/${year}/${month}/${uuid}.webp`;
   const thumbKey = `thumbnails/${year}/${month}/${uuid}.webp`;
 
-  try {
-    const [photoUrl, thumbUrl] = await Promise.all([
-      uploadToR2(photoKey, imageResult.optimized, "image/webp"),
-      uploadToR2(thumbKey, imageResult.thumbnail, "image/webp"),
-    ]);
+  // allSettled rather than all: with `all`, the first rejection starts the cleanup
+  // while the other upload is still in flight, so its object can land *after* the
+  // delete — an orphan nothing in the database references. Waiting for both means
+  // cleanup only ever names keys that actually exist.
+  const [photoRes, thumbRes] = await Promise.allSettled([
+    uploadToR2(photoKey, imageResult.optimized, "image/webp"),
+    uploadToR2(thumbKey, imageResult.thumbnail, "image/webp"),
+  ]);
 
-    return {
-      photoUrl,
-      thumbUrl,
-      blurDataURL,
-      width: imageResult.width,
-      height: imageResult.height,
-      exif,
-      location,
-      uploadedKeys: [photoKey, thumbKey],
-    };
-  } catch (error) {
-    // Attempt cleanup of any keys that may have been written
-    // deleteFromR2 is idempotent — safe to call with non-existent keys
-    await deleteFromR2([photoKey, thumbKey]);
-    throw error;
+  const rollbackLanded = async () => {
+    const landed = [
+      ...(photoRes.status === "fulfilled" ? [photoKey] : []),
+      ...(thumbRes.status === "fulfilled" ? [thumbKey] : []),
+    ];
+    if (!landed.length) return;
+    // Best-effort: a cleanup failure must not replace the original error, or the
+    // caller ends up debugging a delete problem instead of the upload one.
+    try {
+      await deleteFromR2(landed);
+    } catch (cleanupError) {
+      console.warn("Pipeline: rollback of uploaded keys failed:", cleanupError);
+    }
+  };
+
+  if (photoRes.status === "rejected") {
+    await rollbackLanded();
+    throw photoRes.reason;
   }
+  if (thumbRes.status === "rejected") {
+    await rollbackLanded();
+    throw thumbRes.reason;
+  }
+
+  return {
+    photoUrl: photoRes.value,
+    thumbUrl: thumbRes.value,
+    blurDataURL,
+    width: imageResult.width,
+    height: imageResult.height,
+    exif,
+    location,
+    uploadedKeys: [photoKey, thumbKey],
+  };
 }
