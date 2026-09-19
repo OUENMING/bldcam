@@ -166,6 +166,8 @@ bash deploy.sh      # 一键推送到 VPS
 
 项目部署在 https://bldcam.page，VPS + PM2 + Nginx 运行。
 
+`deploy.sh` 会在 `npm run build` **之前**清掉 `deploy-dist`。顺序反了的话，`output: 'standalone'` 会把项目根（含上一轮的 `deploy-dist`）一起 trace 进新产物，再被 `cp -r .next/standalone/*` 复制进去 —— 每部署一次多套一层（实测到过 32 层、263MB，等于每次都在传历史部署的副本）。
+
 图片经 Cloudflare R2 Custom Domain 提供：`cdn.bldcam.page` 挂在 R2 桶 `photosave` 的 **Settings → Custom Domains**，对象带 `max-age=31536000, immutable`，启用边缘缓存。
 
 分享图/图片变慢或"有时加载失败"时，依次查两处：
@@ -185,11 +187,15 @@ bash deploy.sh      # 一键推送到 VPS
 2. **Sharp** 用 `fit: "inside"` 保留原比例，别用 `fit: "cover"`——否则瀑布流像砖墙一样死板
 3. **腾讯云 22 端口被拦截** — 换 2222 端口连接
 4. **rsync `--delete` 把数据库清了** — 必须加 `--exclude='dev.db'`
-5. **分享图已缓存返回 JSON 的坑** — 前端 `fetch` 默认 `Accept: */*`，API 若对非 `image/*` 返回 JSON，前端 `blob.type` 判断会抛 "Not an image" 显示"生成失败"。修复：已缓存时服务端代理返回真 PNG（image 客户端仍走 307 直连）
+5. **分享图路由只有一个响应形态** — 曾按 `Accept` 分支（`image/*` 走 307 直连 CDN，其余代理 PNG）。但 `Accept` 不代表客户端能否跟随跨域重定向（R2 无 CORS 头，`fetch` 跟不了），共享缓存还会把 307 回放给期待 PNG 的客户端。现在一律回 200 PNG，由 CDN 缓存本路由。og:image 指向 `photo.url` 直链，不经过这里
 6. **R2 的 HEAD 请求恒返回 `cf-cache-status: DYNAMIC`** — 测 R2/CDN 缓存必须用 GET，用 `curl -I` 会被误导；且 R2/CDN 无 CORS 头时，前端 fetch 不能跟随跨域 307，只能服务端代理或用 `<img>` 直载
 7. **`sharp().resize(16)` 只固定宽度** — 高度按比例自适应，1×20000 这种极端长宽比会生成 16×320000 的图，PNG 体积与内存都会爆。LQIP 用 `resize(16, 16, { fit: "inside" })` 框住两边
 8. **`DeleteObjectsCommand` 的 `Quiet: true` 会吞掉部分失败** — 该模式下成功项不回，失败项只出现在响应的 `Errors` 数组里；不读它，删除失败和成功长得一模一样。另外单次上限 1000 个 key，超出整体报错，要分批
 9. **`R2_PUBLIC_URL` 默认空串，`url.startsWith("")` 恒为 true** — 用它做前缀判断前必须先确认非空，否则整个 URL（含协议域名）都会被当成对象 key
+10. **PNG 的 `quality` 不是压缩质量** — sharp 里它意味着"用最少颜色达到给定质量"，会开启调色板量化（≤256 色），照片暗部直接出色带。分享图踩过。要调压缩用 `compressionLevel`（0-9，无损）；只传 `quality` 而没开 `palette` 时它是空操作
+11. **上传流水线必须有 `.rotate()`** — 无参 `.rotate()` 按 EXIF 烘焙方向。缺了它像素不转、编码后 orientation 标签也丢了（实测输出 webp 的 `orientation` 为 `undefined`），竖拍照片浏览器无从补救。尺寸取 `metadata().autoOrient`，别手算 `orientation >= 5` 的交换
+12. **原图下载的缓存要跟着内容走** — URL 稳定但内容会变（旋转会换 R2 对象）。`immutable` 会让换图后一年内所有缓存返回旧图。现在用 `updatedAt` 派生 ETag + `must-revalidate`，命中 304 时连 sharp 转码都省掉
+13. **线上验证先排除边缘缓存** — 部署后立刻测可能拿到 Cloudflare 的旧响应（曾因此误判"新代码没上线"）。看 `cf-cache-status`，或隔一会儿重发
 
 ## 项目总结
 
