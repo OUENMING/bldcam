@@ -100,23 +100,27 @@ export default async function HomePage({ searchParams }: PageProps) {
       {/* ── Right content ─────────────────────────── */}
       <div className="flex-1 px-4 py-8 md:px-6 md:py-12">
         <h1 className="sr-only">BLDcam — 星空摄影作品集</h1>
-        {initialPhotos.length === 0 ? (
-          <div className="flex min-h-[60vh] items-center justify-center">
-            <div className="text-center space-y-2">
-              <p className="text-muted-foreground">
-                {city
-                  ? `"${city}" 还没有照片`
-                  : category
-                    ? `"${category}" 分类还没有照片`
-                    : "还没有照片"}
-              </p>
-              <p className="text-muted-foreground/60 text-sm">
-                去后台<Link href="/admin" className="underline">上传</Link>第一张吧
-              </p>
+        {/* The boundary wraps both branches, not just the gallery: filtering down
+            to no results swaps the grid for the empty state, and with the
+            boundary inside the non-empty branch it unmounted in that same
+            update, so the swap had nothing to animate. */}
+        <GalleryTransition>
+          {initialPhotos.length === 0 ? (
+            <div className="flex min-h-[60vh] items-center justify-center">
+              <div className="text-center space-y-2">
+                <p className="text-muted-foreground">
+                  {city
+                    ? `"${city}" 还没有照片`
+                    : category
+                      ? `"${category}" 分类还没有照片`
+                      : "还没有照片"}
+                </p>
+                <p className="text-muted-foreground/60 text-sm">
+                  去后台<Link href="/admin" className="underline">上传</Link>第一张吧
+                </p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <GalleryTransition>
+          ) : (
             <PhotoGrid
               key={filterKey}
               initialPhotos={initialPhotos}
@@ -124,8 +128,8 @@ export default async function HomePage({ searchParams }: PageProps) {
               city={city}
               category={category}
             />
-          </GalleryTransition>
-        )}
+          )}
+        </GalleryTransition>
         </div>
       </div>
     );

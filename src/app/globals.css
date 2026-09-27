@@ -190,8 +190,14 @@
    did nothing. Do not write both declarations — the minifier folds
    `transform: none; translate: none` into `transform: translate(0)` and the
    translate offset survives. The reveal element carries no transform utility,
-   so `translate` alone is the complete reset. */
-html[data-view-transition="active"] [data-reveal-card] {
+   so `translate` alone is the complete reset.
+
+   Keyed on `:active-view-transition` rather than an attribute we set from JS:
+   the filter changes are driven by React, so there is no JS hook to set an
+   attribute on that path, and it was only ever covering the view-mode toggle.
+   Measured during a React-driven filter transition without this: cards entered
+   the snapshot at `translate: 0px 32px` and `opacity: 0`. */
+html:active-view-transition [data-reveal-card] {
   opacity: 1;
   translate: none;
   transition: none;
@@ -201,7 +207,7 @@ html[data-view-transition="active"] [data-reveal-card] {
    card, `opacity-0` on the feed card — and `isLoaded` only flips when `onLoad`
    commits, after the snapshot. Without this the incoming snapshot holds blank or
    blurred frames and the photo fades in from nothing. */
-html[data-view-transition="active"] [data-reveal-card] img {
+html:active-view-transition [data-reveal-card] img {
   opacity: 1;
   filter: none;
 }

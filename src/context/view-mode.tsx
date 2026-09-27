@@ -58,13 +58,12 @@ export function ViewModeProvider({
       return;
     }
 
+    // The browser captures the "after" snapshot the moment this callback returns,
+    // so the render has to be synchronous — a concurrent one would not have
+    // committed yet. Resetting the cards' reveal state for that capture is keyed
+    // on the `:active-view-transition` pseudo-class (see globals.css), so there is
+    // nothing to set here and nothing to clean up afterwards.
     const transition = document.startViewTransition(() => {
-      // The browser captures the "after" snapshot the moment this callback
-      // returns, so the render has to be synchronous — a concurrent one would
-      // not have committed yet. The attribute makes the cards skip their
-      // opacity-0 reveal state for that capture; without it every photo morphs
-      // into an invisible box.
-      document.documentElement.dataset.viewTransition = "active";
       flushSync(apply);
     });
 
@@ -72,15 +71,11 @@ export function ViewModeProvider({
     // rejects the transition's promises with an AbortError. `ready` is never read
     // by anything, so it leaked an unhandled rejection on every such click;
     // `finished` needs its own catch too, because `finally` alone passes the
-    // rejection through to an unhandled promise. Measured with the fix removed:
+    // rejection through to an unhandled promise. Measured with these removed:
     // three rapid clicks produced two AbortErrors; catching `ready` as well
     // brings that to zero. (`updateCallbackDone` does not reject here — measured.)
     transition.ready.catch(() => {});
-    transition.finished
-      .catch(() => {})
-      .finally(() => {
-        delete document.documentElement.dataset.viewTransition;
-      });
+    transition.finished.catch(() => {});
   }, [mode]);
 
   return (
