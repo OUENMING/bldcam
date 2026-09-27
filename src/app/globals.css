@@ -2,6 +2,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Tailwind scans every non-ignored file for class candidates, prose included.
+   `docs/项目总结.md` writes the lightbox padding as `pb-[calc(1rem+env(...))]`
+   shorthand, which Tailwind takes literally and turns into invalid CSS —
+   Turbopack's stricter parser then fails the whole stylesheet and the page
+   renders blank in dev. Markdown is not source; keep it out of the scan. */
+@source not "../../docs";
+
 /* `.dark *` alone only matched descendants, so a `dark:` utility on the element
    that carries `.dark` itself — the <html> tag the FOUC script stamps — silently
    did nothing. Adding `.dark` to the list is a strict superset, and :is() keeps
@@ -156,4 +163,32 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ── View-mode transition (waterfall ⇄ feed) ──────────────────────────
+   The two galleries are separate trees, so the browser has nothing to
+   interpolate between them. Naming each card's frame pairs the elements across
+   the swap, which turns a layout change into the photos moving between two
+   geometries. 400ms and an exponential ease-out: this is a layout change, and
+   it should read as confident rather than springy. */
+::view-transition-group(*) {
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Only the cards are named, and named elements are lifted out of the root
+   snapshot. Left animating, the root cross-fades the header and sidebar — which
+   did not change — for no reason. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+/* Card reveal starts at opacity-0 and only lifts once its IntersectionObserver
+   fires, one frame after the browser has already captured the "after" snapshot.
+   Without this the transition morphs every photo into an invisible box. */
+html[data-view-transition="active"] [data-reveal-card] {
+  opacity: 1;
+  transform: none;
+  transition: none;
 }

@@ -17,7 +17,7 @@
 - **双主题** — 默认暗色（星空专用暖色高光替代蓝色调），一键切亮色
 - **地图标记** — MapLibre 集成，每张照片标注拍摄地点，交互式浏览
 - **EXIF 数据** — 自动提取相机参数（ISO、快门、光圈、焦距、时间）
-- **双视图模式** — "沉浸" / "列表" 自由切换
+- **双视图模式** — "沉浸" / "列表" 自由切换，切换时照片在两种版式之间连续移动而不是硬切（浏览器 View Transitions，零依赖）
 - **AI 标题/分类建议** — 上传时由豆包视觉模型（Volcengine Ark）给出标题与分类建议，手动触发、可改可不改
 - **管理后台** — 登录后可上传、编辑、管理照片（admin 路由）
 
@@ -44,6 +44,7 @@
 | 原图下载 | WebP→PNG 转码下载 | Sharp 服务端转码 | 2026-08-06 | v2.0.1 |
 | 分享图稳定性 | 已缓存直接返回 PNG + CDN 边缘缓存 | R2 Custom Domain + 服务端代理 | 2026-08-06 | v2.0.1 |
 | 上传/下载上限 | 上传 ≤20MB 且限图片 MIME；下载源图 ≤30MB、解码 ≤5000 万像素 | 服务端校验 + sharp `limitInputPixels` | 2026-09-19 | v2.1 |
+| 视图切换过渡 | 瀑布流 ↔ 单列：同一张照片跨版式配对，连续移动而不硬切 | View Transitions API（Next 16 内置，零依赖） | 2026-09-27 | v2.2 |
 
 ## 技术栈
 
@@ -99,7 +100,7 @@ camlife-lite/
 │   ├── context/                  # 视图模式（waterfall/feed）
 │   ├── features/map/             # MapLibre 地图（逐点 Marker，无聚合）
 │   ├── hooks/                    # 自定义 Hooks
-│   ├── lib/                      # AI、R2、auth、geocode、prisma、图片流水线
+│   ├── lib/                      # AI、R2、auth、geocode、prisma、图片流水线、视图模式常量
 ├── prisma/
 │   └── schema.prisma             # Photo 模型
 ├── scripts/                      # 工具脚本
@@ -196,6 +197,9 @@ bash deploy.sh      # 一键推送到 VPS
 11. **上传流水线必须有 `.rotate()`** — 无参 `.rotate()` 按 EXIF 烘焙方向。缺了它像素不转、编码后 orientation 标签也丢了（实测输出 webp 的 `orientation` 为 `undefined`），竖拍照片浏览器无从补救。尺寸取 `metadata().autoOrient`，别手算 `orientation >= 5` 的交换
 12. **原图下载的缓存要跟着内容走** — URL 稳定但内容会变（旋转会换 R2 对象）。`immutable` 会让换图后一年内所有缓存返回旧图。现在用 `updatedAt` 派生 ETag + `must-revalidate`，命中 304 时连 sharp 转码都省掉
 13. **线上验证先排除边缘缓存** — 部署后立刻测可能拿到 Cloudflare 的旧响应（曾因此误判"新代码没上线"）。看 `cf-cache-status`，或隔一会儿重发
+14. **Tailwind v4 会把 `docs/*.md` 当源码扫** — 文档里写 `pb-[calc(1rem+env(...))]` 这种省略号简写会被照字面生成 CSS，`env(...)` 非法 → Turbopack 的 CSS 解析器直接失败 → **整个页面白屏**。`next build` 用的 PostCSS 更宽松，所以构建通过、只有 dev 坏，很容易误判成"代码有问题"。用 `@source not "../../docs"` 把文档排除出扫描范围
+15. **`"use client"` 模块导出的常量，在 Server Component 里不是那个常量** — 服务端 import 到的是 `registerClientReference` 的代理对象，`cookies().get(VIEW_MODE_COOKIE)` 永远拿到 `undefined`。症状极隐蔽：cookie 确实写进去了、客户端切换一切正常，只是**一刷新就回默认值**。常量要和 provider 分文件，走普通模块导出
+16. **View Transition 的"之后"快照在 IntersectionObserver 之前拍** — 卡片入场动画从 `opacity-0` 起步，而快照是 `flushSync` 之后同步拍的、IO 回调还没跑，浏览器会把每张照片都拍成空白框，过渡就变成"照片淡成空气"。过渡期间必须让卡片停在终态（本项目用 `html[data-view-transition="active"] [data-reveal-card]`）
 
 ## 项目总结
 

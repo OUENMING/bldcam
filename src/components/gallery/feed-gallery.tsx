@@ -40,6 +40,7 @@ function FeedCard({
   return (
     <div
       ref={ref}
+      data-reveal-card
       className={cn(
         "flex w-full flex-col items-center",
         "transition-[opacity,transform] duration-700 ease-out",
@@ -55,6 +56,8 @@ function FeedCard({
           width: displaySize.width,
           height: displaySize.height,
           maxWidth: "100%",
+          // Counterpart of the waterfall card's frame — see photo-card.tsx.
+          viewTransitionName: `photo-${photo.id}`,
         }}
         onClick={() => onOpen?.(index)}
       >

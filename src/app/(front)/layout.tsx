@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
 import { Header } from "@/components/layout/header";
-import {
-  ViewModeProvider,
-  VIEW_MODE_COOKIE,
-  type ViewMode,
-} from "@/context/view-mode";
+import { ViewModeProvider } from "@/context/view-mode";
+// The constant comes from a plain module, not from the `"use client"` provider:
+// importing a value from a client module into a Server Component yields a
+// client-reference proxy, which `cookies().get()` cannot use as a cookie name.
+import { VIEW_MODE_COOKIE, type ViewMode } from "@/lib/view-mode";
 
 export default async function FrontLayout({
   children,

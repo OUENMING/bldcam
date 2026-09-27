@@ -30,6 +30,7 @@ function PhotoCard({ photo, index, priority = false, onOpen }: PhotoCardProps) {
   return (
     <div
       ref={ref}
+      data-reveal-card
       className={cn(
         "mb-2 break-inside-avoid select-none sm:mb-3 md:mb-4",
         inView && isLoaded
@@ -39,6 +40,11 @@ function PhotoCard({ photo, index, priority = false, onOpen }: PhotoCardProps) {
       )}
     >
       <div
+        // Pairs this frame with the same photo's frame in the feed gallery, so a
+        // view-mode switch moves the photo between the two geometries instead of
+        // cutting. Names must be unique per document — the two galleries never
+        // render at once, so one name per photo is enough.
+        style={{ viewTransitionName: `photo-${photo.id}` }}
         className={cn(
           "group relative cursor-pointer overflow-hidden rounded-2xl",
           "bg-muted shadow-md transition-shadow duration-500 ease-out",
