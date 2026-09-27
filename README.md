@@ -204,6 +204,8 @@ bash deploy.sh      # 一键推送到 VPS
 16. **View Transition 的"之后"快照在 IntersectionObserver 之前拍** — 卡片入场动画从 `opacity-0` 起步，而快照是 `flushSync` 之后同步拍的、IO 回调还没跑，浏览器会把每张照片都拍成空白框，过渡就变成"照片淡成空气"。过渡期间必须让卡片停在终态（本项目用 `html[data-view-transition="active"] [data-reveal-card]`）
 17. **只给 `::view-transition-group(*)` 设时长不够** — 位移（group）和淡入淡出（old/new）是**不同的** UA 动画，只设 group 时 old/new 会停在浏览器默认的 150ms：照片还没移动完就已经淡完了。实测一次筛选过渡里 50 个动画，46 个 400ms、4 个 150ms（那 4 个是侧边栏链接的颜色过渡，无关）。三条必须一起设
 18. **Next 的路由自己不会启动视图过渡** — 挂钩 `document.startViewTransition` 后点筛选链接实测 **0 次调用**。驱动方是 React 的 `<ViewTransition>` 组件：`experimental.viewTransition: true`（默认 false）**和**树里真的有组件，缺一不可。React 文档还写明不要自己调 `startViewTransition`（它会打断你）、且 `flushSync` 会让它跳过 —— 所以本项目 ① 的手动调用和 React 的机制是并存的两套，靠二者不同时触发；同一时刻只会有一次过渡，另一次被跳过而不是报错
+19. **`transform: none; translate: none` 会被压缩器合并成 `transform: translate(0)`** — 而 Tailwind v4 的 `translate-y-4` 走的是**独立的 `translate` 属性**，那条 `transform` 管不到它。实测构建产物里 `translate:none` 出现 **0 次**，偏移原封不动留着。**不要在同一个规则里同时写这两条**；复位只用 `translate: none`（`transform` 是多余的），压缩器没有可合并的对象就放行了
+20. **过渡被跳过时 reject 的是 `ready`，不只是 `finished`** — 连点两次 toggle 会让第二个过渡被跳过（`AbortError`）。只给 `finished` 加 `catch` 实测**无效**（仍泄漏 2 条），因为 `ready` 从没被读过、它的 rejection 无人处理。两个都要接；`updateCallbackDone` 不 reject（实测）。判别手法：`unhandledrejection` 事件带 `e.promise`，直接和过渡对象的 promise 比身份，不用猜
 
 ## 项目总结
 

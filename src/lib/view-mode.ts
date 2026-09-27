@@ -11,3 +11,13 @@
 export const VIEW_MODE_COOKIE = "bldcam-view-mode";
 
 export type ViewMode = "waterfall" | "feed";
+
+/**
+ * The `view-transition-name` that identifies one photo across the two gallery
+ * layouts.
+ *
+ * The waterfall card and the feed card must agree on this exactly, and a mismatch
+ * does not error — it just silently degrades to no transition. Keeping the format
+ * here is the only thing that makes that safe.
+ */
+export const photoViewTransitionName = (id: string) => `photo-${id}`;

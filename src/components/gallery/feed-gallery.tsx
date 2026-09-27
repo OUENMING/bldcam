@@ -5,6 +5,7 @@ import { memo, useState } from "react";
 import { useInViewOnce } from "@/hooks/use-in-view-once";
 import { cn } from "@/lib/utils";
 import { useImageDisplaySize } from "@/hooks/use-image-display-size";
+import { photoViewTransitionName } from "@/lib/view-mode";
 import { formatExifLine, formatLocation } from "@/lib/format";
 import type { Photo } from "@prisma/client";
 
@@ -57,7 +58,7 @@ function FeedCard({
           height: displaySize.height,
           maxWidth: "100%",
           // Counterpart of the waterfall card's frame — see photo-card.tsx.
-          viewTransitionName: `photo-${photo.id}`,
+          viewTransitionName: photoViewTransitionName(photo.id),
         }}
         onClick={() => onOpen?.(index)}
       >

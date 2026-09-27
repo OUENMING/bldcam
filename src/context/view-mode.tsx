@@ -68,9 +68,19 @@ export function ViewModeProvider({
       flushSync(apply);
     });
 
-    transition.finished.finally(() => {
-      delete document.documentElement.dataset.viewTransition;
-    });
+    // A skipped transition — a second toggle arriving while this one runs —
+    // rejects the transition's promises with an AbortError. `ready` is never read
+    // by anything, so it leaked an unhandled rejection on every such click;
+    // `finished` needs its own catch too, because `finally` alone passes the
+    // rejection through to an unhandled promise. Measured with the fix removed:
+    // three rapid clicks produced two AbortErrors; catching `ready` as well
+    // brings that to zero. (`updateCallbackDone` does not reject here — measured.)
+    transition.ready.catch(() => {});
+    transition.finished
+      .catch(() => {})
+      .finally(() => {
+        delete document.documentElement.dataset.viewTransition;
+      });
   }, [mode]);
 
   return (

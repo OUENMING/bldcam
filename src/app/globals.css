@@ -185,11 +185,25 @@
 
 /* Card reveal starts at opacity-0 and only lifts once its IntersectionObserver
    fires, one frame after the browser has already captured the "after" snapshot.
-   Without this the transition morphs every photo into an invisible box. */
+   The offset must be reset as `translate`, not `transform`: Tailwind v4 emits
+   `translate-y-4` as the standalone `translate` property, so `transform: none`
+   did nothing. Do not write both declarations — the minifier folds
+   `transform: none; translate: none` into `transform: translate(0)` and the
+   translate offset survives. The reveal element carries no transform utility,
+   so `translate` alone is the complete reset. */
 html[data-view-transition="active"] [data-reveal-card] {
   opacity: 1;
-  transform: none;
+  translate: none;
   transition: none;
+}
+
+/* The image has its own loading gate — blurred and desaturated on the waterfall
+   card, `opacity-0` on the feed card — and `isLoaded` only flips when `onLoad`
+   commits, after the snapshot. Without this the incoming snapshot holds blank or
+   blurred frames and the photo fades in from nothing. */
+html[data-view-transition="active"] [data-reveal-card] img {
+  opacity: 1;
+  filter: none;
 }
 
 /* The block above does not cover these: `*` matches elements, not pseudo-elements,

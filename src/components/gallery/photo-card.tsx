@@ -5,6 +5,7 @@ import Link from "next/link";
 import { memo, useState } from "react";
 import { useInViewOnce } from "@/hooks/use-in-view-once";
 import { cn } from "@/lib/utils";
+import { photoViewTransitionName } from "@/lib/view-mode";
 import { formatExifLine } from "@/lib/format";
 import type { Photo } from "@prisma/client";
 
@@ -44,7 +45,7 @@ function PhotoCard({ photo, index, priority = false, onOpen }: PhotoCardProps) {
         // view-mode switch moves the photo between the two geometries instead of
         // cutting. Names must be unique per document — the two galleries never
         // render at once, so one name per photo is enough.
-        style={{ viewTransitionName: `photo-${photo.id}` }}
+        style={{ viewTransitionName: photoViewTransitionName(photo.id) }}
         className={cn(
           "group relative cursor-pointer overflow-hidden rounded-2xl",
           "bg-muted shadow-md transition-shadow duration-500 ease-out",
