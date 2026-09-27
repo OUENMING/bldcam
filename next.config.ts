@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  experimental: {
+    // Required for React's <ViewTransition> to be usable at all — without it the
+    // component is inert and the router never starts a transition. React drives
+    // view transitions itself; see the note in src/context/view-mode.tsx.
+    viewTransition: true,
+  },
   images: {
     unoptimized: true,
     remotePatterns: [

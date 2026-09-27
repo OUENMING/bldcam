@@ -165,20 +165,19 @@
   }
 }
 
-/* ── View-mode transition (waterfall ⇄ feed) ──────────────────────────
-   The two galleries are separate trees, so the browser has nothing to
-   interpolate between them. Naming each card's frame pairs the elements across
-   the swap, which turns a layout change into the photos moving between two
-   geometries. 400ms and an exponential ease-out: this is a layout change, and
-   it should read as confident rather than springy. */
-::view-transition-group(*) {
+/* ── View transitions (view-mode switch, filter changes) ──────────────
+   The group morph and the old/new cross-fade are separate UA animations. Setting
+   only `group` left the fades at their 150ms default, so a photo finished
+   cross-fading while it was still moving. One duration, one curve, one tempo. */
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
   animation-duration: 400ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Only the cards are named, and named elements are lifted out of the root
-   snapshot. Left animating, the root cross-fades the header and sidebar — which
-   did not change — for no reason. */
+/* The header and sidebar do not change, and named elements are lifted out of the
+   root snapshot anyway — so the root has nothing left to animate. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
@@ -191,4 +190,15 @@ html[data-view-transition="active"] [data-reveal-card] {
   opacity: 1;
   transform: none;
   transition: none;
+}
+
+/* The block above does not cover these: `*` matches elements, not pseudo-elements,
+   so a React-driven transition kept animating under reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+  }
 }

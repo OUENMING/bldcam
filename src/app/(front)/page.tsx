@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PhotoGrid } from "@/components/gallery/photo-grid";
+import { GalleryTransition } from "@/components/gallery/gallery-transition";
 import { CitySidebar } from "@/components/layout/city-sidebar";
 
 export const dynamic = "force-dynamic";
@@ -115,13 +116,15 @@ export default async function HomePage({ searchParams }: PageProps) {
             </div>
           </div>
         ) : (
-          <PhotoGrid
-            key={filterKey}
-            initialPhotos={initialPhotos}
-            totalCount={filteredCount}
-            city={city}
-            category={category}
-          />
+          <GalleryTransition>
+            <PhotoGrid
+              key={filterKey}
+              initialPhotos={initialPhotos}
+              totalCount={filteredCount}
+              city={city}
+              category={category}
+            />
+          </GalleryTransition>
         )}
         </div>
       </div>
