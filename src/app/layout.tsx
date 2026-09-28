@@ -28,6 +28,11 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  // Resolves relative metadata URLs — `app/opengraph-image.png` above all. Without
+  // it Next falls back to localhost:3000, so the og:image shipped as
+  // `http://localhost:3000/opengraph-image.png` and every shared link had a broken
+  // preview. Same literal the sitemap uses.
+  metadataBase: new URL("https://bldcam.page"),
   title: {
     default: "BLDcam — 摄影作品集",
     template: "%s · BLDcam",
