@@ -9,6 +9,19 @@ interface UseReveal {
 }
 
 /**
+ * How far outside the viewport still counts as "about to be seen".
+ *
+ * Both decisions below use this one value, and they have to agree. It is the band
+ * where the entrance is already underway by the time the card crosses the edge,
+ * so a fast scroll never shows a card that is still fully transparent at the crop
+ * edge — and therefore also the band where a freshly mounted card counts as
+ * already on screen. When the two disagreed, a card landing in this band at mount
+ * was judged off screen, then immediately reported as intersecting, and burned
+ * its entrance while still below the fold.
+ */
+const PRE_TRIGGER_PX = 200;
+
+/**
  * Whether an element should play an entrance animation.
  *
  * Deliberately not "is it in view". A card that is already on screen when it
@@ -41,7 +54,10 @@ export function useReveal(): UseReveal {
     // user scroll before it arrives — and a card that mounted below the fold
     // would then report as already visible and lose its entrance for good.
     const rect = el.getBoundingClientRect();
-    if (rect.top < window.innerHeight && rect.bottom > 0) {
+    const withinPreTriggerBand =
+      rect.top < window.innerHeight + PRE_TRIGGER_PX &&
+      rect.bottom > -PRE_TRIGGER_PX;
+    if (withinPreTriggerBand) {
       settledRef.current = true;
       return;
     }
@@ -54,11 +70,7 @@ export function useReveal(): UseReveal {
         observer.disconnect();
         observerRef.current = null;
       },
-      // Deliberately not zero: the entrance should already be underway by the
-      // time the card reaches the viewport, so a fast scroll never reveals a
-      // card that is still fully transparent at the crop edge. The trade-off is
-      // that this is also the band in which the entrance has already finished.
-      { threshold: 0.05, rootMargin: "200px" },
+      { threshold: 0.05, rootMargin: `${PRE_TRIGGER_PX}px` },
     );
 
     observer.observe(el);
