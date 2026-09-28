@@ -206,7 +206,13 @@
 }
 
 .card-reveal {
-  animation: card-reveal 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* `backwards`, not `both`: the final keyframe equals the card's resting state,
+   * so there is nothing to hold, and `forwards` would pin those two properties at
+   * the animation origin forever — above every author declaration including
+   * Tailwind's `@layer utilities`. Any `opacity-*` or `translate-*` added to a
+   * card later (hover included) would silently do nothing. With no delay the two
+   * fill modes are indistinguishable at the start of the animation. */
+  animation: card-reveal 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 /* The block above does not cover these: `*` matches elements, not pseudo-elements,

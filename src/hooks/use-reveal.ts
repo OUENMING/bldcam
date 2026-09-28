@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 interface UseReveal {
   ref: (el: HTMLElement | null) => void;
@@ -15,10 +15,11 @@ interface UseReveal {
  * mounts has to stay still: during a view-mode or filter swap the incoming cards
  * mount inside the viewport, so an entrance would start them at `opacity: 0` —
  * which is exactly the frame the browser captures for a view transition's
- * "after" snapshot, and every photo would fade in from nothing. Only a card that
- * mounts below the fold and is later scrolled into view animates.
+ * "after" snapshot, and every photo would fade in from nothing.
  *
- * One observer per element, disconnected as soon as its answer is known.
+ * One observer per element, disconnected as soon as its answer is known, and
+ * again with null on unmount — that is the only unmount path; there is no
+ * separate effect doing the same job.
  */
 export function useReveal(): UseReveal {
   const [reveal, setReveal] = useState(false);
@@ -26,37 +27,37 @@ export function useReveal(): UseReveal {
   // React re-invokes `ref` when it rebinds the element; the entrance happens once.
   const settledRef = useRef(false);
 
-  useEffect(() => () => observerRef.current?.disconnect(), []);
-
   const ref = useCallback((el: HTMLElement | null) => {
     // React calls this with null on unmount and again with a new element when
-    // the node is replaced. Either way the previous observer has to go, or it
-    // stays registered on a detached element until this component unmounts.
+    // the node is replaced, so the previous observer has to go either way or it
+    // stays registered on a detached element.
     observerRef.current?.disconnect();
     observerRef.current = null;
     if (!el || settledRef.current) return;
 
-    let firstReport = true;
+    // Read the mount-time geometry synchronously rather than waiting for the
+    // observer's first callback. That callback is delivered during the rendering
+    // steps, not as a microtask, so hydration or a slow first layout can let the
+    // user scroll before it arrives — and a card that mounted below the fold
+    // would then report as already visible and lose its entrance for good.
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight && rect.bottom > 0) {
+      settledRef.current = true;
+      return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (firstReport) {
-          firstReport = false;
-          if (entry.isIntersecting) {
-            // Already on screen at mount — leave it alone for good.
-            settledRef.current = true;
-            observer.disconnect();
-            observerRef.current = null;
-          }
-          // Otherwise it is below the fold; keep watching for the scroll-in.
-          return;
-        }
-        if (entry.isIntersecting) {
-          settledRef.current = true;
-          setReveal(true);
-          observer.disconnect();
-          observerRef.current = null;
-        }
+        if (!entry.isIntersecting) return;
+        settledRef.current = true;
+        setReveal(true);
+        observer.disconnect();
+        observerRef.current = null;
       },
+      // Deliberately not zero: the entrance should already be underway by the
+      // time the card reaches the viewport, so a fast scroll never reveals a
+      // card that is still fully transparent at the crop edge. The trade-off is
+      // that this is also the band in which the entrance has already finished.
       { threshold: 0.05, rootMargin: "200px" },
     );
 
