@@ -7,8 +7,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Photo } from "@prisma/client";
 import { useViewMode } from "@/context/view-mode";
-import { MemoizedPhotoCard } from "./photo-card";
-import { FeedGallery } from "./feed-gallery";
+import { PhotoGallery } from "./photo-gallery";
 import { ShareDialog } from "./share-dialog";
 
 const PhotoLightbox = dynamic(
@@ -158,25 +157,9 @@ export function PhotoGrid({
 
   return (
     <>
-      {/* ── Waterfall ──────────────────────────── */}
-      {mode !== "feed" && (
-        <div className="columns-1 gap-4 min-[420px]:columns-2 min-[420px]:gap-3 md:columns-3 md:gap-4 lg:columns-4">
-          {photos.map((photo, i) => (
-            <MemoizedPhotoCard
-              key={photo.id}
-              photo={photo}
-              index={i}
-              priority={i < 2}
-              onOpen={openPhoto}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* ── Feed ───────────────────────────────── */}
-      {mode === "feed" && (
-        <FeedGallery photos={photos} onPhotoClick={openPhoto} />
-      )}
+      {/* ── Gallery ────────────────────────────── */}
+      {/* One component for both layouts so React keeps the DOM — see photo-gallery.tsx. */}
+      <PhotoGallery photos={photos} variant={mode} onOpen={openPhoto} />
 
       {/* ── Sentinel + loading / end indicator ──── */}
       <div

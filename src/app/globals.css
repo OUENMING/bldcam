@@ -183,6 +183,22 @@
   animation: none;
 }
 
+/* Lifts the header out of the root snapshot into a group of its own.
+   It is `sticky`, so it is on screen at every scroll position, which made it part
+   of the root snapshot at full size on a page that grows to ~62,000px — rasterised
+   twice, once per side, for an element that does not change. Inside its own group
+   the old and new images are identical, so there is nothing to animate either.
+   The `!important`-free shorthand below relies on this rule coming after the
+   `group(*)` block above it. */
+header {
+  view-transition-name: site-header;
+}
+
+::view-transition-old(site-header),
+::view-transition-new(site-header) {
+  animation: none;
+}
+
 /* Cards the transition is not allowed to snapshot. A view transition captures
    every named element regardless of whether it is on screen (`visible` is still
    only a proposal in CSSWG#8282), and infinite scroll keeps every card ever
