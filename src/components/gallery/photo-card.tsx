@@ -39,10 +39,9 @@ function PhotoCard({ photo, index, priority = false, onOpen }: PhotoCardProps) {
       )}
     >
       <div
-        // Pairs this frame with the same photo's frame in the feed gallery, so a
-        // view-mode switch moves the photo between the two geometries instead of
-        // cutting. Names must be unique per document — the two galleries never
-        // render at once, so one name per photo is enough.
+        // The id is here as well as in the name so a transition can strip the name
+        // from cards that are off screen — see src/lib/view-transition-cards.ts.
+        data-vt-id={photo.id}
         style={{ viewTransitionName: photoViewTransitionName(photo.id) }}
         className={cn(
           "group relative cursor-pointer overflow-hidden rounded-2xl",

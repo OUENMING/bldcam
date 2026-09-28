@@ -4,11 +4,17 @@ import {
   createContext,
   useCallback,
   useContext,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { flushSync } from "react-dom";
 import { VIEW_MODE_COOKIE, type ViewMode } from "@/lib/view-mode";
+import {
+  clearFarCards,
+  markFarCards,
+  nearCardIds,
+} from "@/lib/view-transition-cards";
 
 // ── Types ──────────────────────────────────────────
 
@@ -35,6 +41,10 @@ export function ViewModeProvider({
   // which the server cannot see — it could only guess "waterfall", and React then
   // corrected after hydration, re-mounting the whole gallery for anyone on "feed".
   const [mode, setMode] = useState<ViewMode>(initialMode);
+  // Which toggle owns the card-restriction marks. A skipped transition still
+  // rejects `finished`, and without this its cleanup would wipe the marks a newer
+  // toggle had just applied — leaving that transition naming cards it meant to skip.
+  const toggleToken = useRef(0);
 
   const toggle = useCallback(() => {
     // Computed outside the updater on purpose: an updater must be pure, and
@@ -58,6 +68,12 @@ export function ViewModeProvider({
       return;
     }
 
+    // Decide which cards may be snapshotted from the layout being left, and use
+    // that same set for both snapshots. See src/lib/view-transition-cards.ts.
+    const token = ++toggleToken.current;
+    const near = nearCardIds();
+    markFarCards(near);
+
     // The browser captures the "after" snapshot the moment this callback returns,
     // so the render has to be synchronous — a concurrent one would not have
     // committed yet. Resetting the cards' reveal state for that capture is keyed
@@ -67,6 +83,9 @@ export function ViewModeProvider({
     const transition = document.startViewTransition(() => {
       applied = true;
       flushSync(apply);
+      // The incoming cards are new DOM nodes, so the restriction has to be put
+      // back before this returns and the "after" snapshot is taken.
+      markFarCards(near);
     });
 
     // `ready` rejects whenever the transition does not actually run, and in some
@@ -83,7 +102,11 @@ export function ViewModeProvider({
     transition.ready.catch(() => {
       if (!applied) apply();
     });
-    transition.finished.catch(() => {});
+    transition.finished
+      .catch(() => {})
+      .finally(() => {
+        if (token === toggleToken.current) clearFarCards();
+      });
   }, [mode]);
 
   return (

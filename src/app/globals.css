@@ -172,7 +172,7 @@
 ::view-transition-group(*),
 ::view-transition-old(*),
 ::view-transition-new(*) {
-  animation-duration: 400ms;
+  animation-duration: 500ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -181,6 +181,17 @@
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
+}
+
+/* Cards the transition is not allowed to snapshot. A view transition captures
+   every named element regardless of whether it is on screen (`visible` is still
+   only a proposal in CSSWG#8282), and infinite scroll keeps every card ever
+   loaded mounted — so naming all of them costs a snapshot and five animations
+   each, for photos nobody can see. `!important` is the point: it is what beats
+   the inline `view-transition-name` the card renders.
+   See src/lib/view-transition-cards.ts. */
+[data-vt-far] {
+  view-transition-name: none !important;
 }
 
 /* The card entrance is an animation, not a state the card starts in. A card

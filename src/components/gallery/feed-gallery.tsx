@@ -49,12 +49,13 @@ function FeedCard({
     >
       {/* ── Image ────────────────────────────────── */}
       <div
+        // Counterpart of the waterfall card's frame — see photo-card.tsx.
+        data-vt-id={photo.id}
         className="group relative cursor-pointer overflow-hidden rounded-3xl bg-background shadow-lg md:rounded-[2rem]"
         style={{
           width: displaySize.width,
           height: displaySize.height,
           maxWidth: "100%",
-          // Counterpart of the waterfall card's frame — see photo-card.tsx.
           viewTransitionName: photoViewTransitionName(photo.id),
         }}
         onClick={() => onOpen?.(index)}
