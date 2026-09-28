@@ -71,8 +71,8 @@ export function ViewModeProvider({
     // Decide which cards may be snapshotted from the layout being left, and use
     // that same set for both snapshots. See src/lib/view-transition-cards.ts.
     const token = ++toggleToken.current;
-    const near = nearCardIds();
-    markFarCards(near);
+    const nearOld = nearCardIds();
+    markFarCards(nearOld);
 
     // The browser captures the "after" snapshot the moment this callback returns,
     // so the render has to be synchronous — a concurrent one would not have
@@ -83,9 +83,23 @@ export function ViewModeProvider({
     const transition = document.startViewTransition(() => {
       applied = true;
       flushSync(apply);
-      // The incoming cards are new DOM nodes, so the restriction has to be put
-      // back before this returns and the "after" snapshot is taken.
-      markFarCards(near);
+      // The incoming cards are new DOM nodes, so the marking has to be redone
+      // before this returns and the "after" snapshot is taken — and it has to
+      // cover the new layout's own viewport, not just the old layout's.
+      //
+      // The two layouts are wildly different heights (waterfall ~7,400px, feed
+      // ~64,600px), and the scroll offset is kept, so the viewport lands on
+      // entirely different photos. Naming only the layout being left left the
+      // one card now on screen unnamed — and an unnamed card does not animate at
+      // all, it just appears. Measured while switching at mid-scroll: of the
+      // cards visible in the new layout, 0 were named and 1 was not, so the whole
+      // 111-animation transition played entirely off screen and the visible card
+      // flashed into place. Naming the union gives that card an enter animation
+      // instead. They are the only extras: a card on screen in neither layout
+      // stays unnamed, and nobody can see it.
+      const nearNew = nearCardIds();
+      for (const id of nearOld) nearNew.add(id);
+      markFarCards(nearNew);
     });
 
     // `ready` rejects whenever the transition does not actually run, and in some

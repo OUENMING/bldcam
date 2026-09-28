@@ -49,13 +49,16 @@ export function nearCardIds(): Set<string> {
  * Strips the name from every card not in `near`.
  *
  * Call it once before `startViewTransition` (so the "before" snapshot is limited)
- * and again inside the update callback after the render (the incoming cards are
- * new DOM nodes, so they need marking before the "after" snapshot is taken).
+ * and again inside the update callback after the render — the incoming cards are
+ * new DOM nodes, so they need marking before the "after" snapshot is taken.
  *
- * The same `near` set has to be used for both snapshots. The two layouts put
- * different cards on screen, so recomputing per snapshot would leave cards named
- * on one side and not the other — and a name that only exists on one side does
- * not morph, it silently does nothing.
+ * The two calls want different sets, and using the same one is wrong in a way
+ * that is easy to miss. The set taken from the layout being left is what makes a
+ * card morph (a name has to exist on both sides to pair); the set taken from the
+ * incoming layout is what keeps a card from appearing with no animation at all.
+ * The two layouts here differ about ninefold in height, so a mid-scroll switch
+ * lands the viewport on completely different photos — measured: of the cards
+ * visible afterwards, none were in the outgoing set. Pass the union.
  */
 export function markFarCards(near: Set<string>): void {
   for (const el of document.querySelectorAll<HTMLElement>(FRAME_SELECTOR)) {
