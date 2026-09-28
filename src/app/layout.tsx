@@ -8,6 +8,7 @@ import {
 } from "@/lib/theme-constants";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const instrumentSerif = Instrument_Serif({
@@ -31,8 +32,8 @@ export const metadata: Metadata = {
   // Resolves relative metadata URLs — `app/opengraph-image.png` above all. Without
   // it Next falls back to localhost:3000, so the og:image shipped as
   // `http://localhost:3000/opengraph-image.png` and every shared link had a broken
-  // preview. Same literal the sitemap uses.
-  metadataBase: new URL("https://bldcam.page"),
+  // preview.
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "BLDcam — 摄影作品集",
     template: "%s · BLDcam",
@@ -43,7 +44,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "BLDcam — 摄影作品集",
     description: "星空与旅行摄影作品 · 由 AI 自动分类整理",
-    url: "https://bldcam.page",
+    url: SITE_URL,
     siteName: "BLDcam",
     locale: "zh_CN",
     type: "website",

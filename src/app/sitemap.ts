@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
+import { SITE_URL } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = "https://bldcam.page";
+  const baseUrl = SITE_URL;
 
   // Static routes
   const staticRoutes: MetadataRoute.Sitemap = [

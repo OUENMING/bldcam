@@ -188,9 +188,13 @@
    of the root snapshot at full size on a page that grows to ~62,000px — rasterised
    twice, once per side, for an element that does not change. Inside its own group
    the old and new images are identical, so there is nothing to animate either.
-   The `!important`-free shorthand below relies on this rule coming after the
-   `group(*)` block above it. */
-header {
+
+   Scoped by attribute rather than the bare `header` tag: `admin-console.tsx` renders
+   a `<header>` too. It is a different route today, but two elements sharing a
+   `view-transition-name` makes the browser abandon the whole transition — silently,
+   and for every transition on the page, which is a genuinely nasty thing to debug.
+   The attribute is on the one header that should be named and nowhere else. */
+header[data-site-header] {
   view-transition-name: site-header;
 }
 
@@ -260,30 +264,41 @@ header {
    blue selection is the one cold colour on screen.
 
    None of this removes an affordance; each rule only re-points something the
-   browser already draws at the palette. */
-::selection {
-  /* A tint of the amber accent rather than a flat block: at 34% over either
-     theme's background it stays legible without hiding the photo behind it. */
-  background: color-mix(in oklab, var(--primary) 34%, transparent);
-  color: var(--foreground);
-}
+   browser already draws at the palette.
 
-html {
-  caret-color: var(--primary);
-  scrollbar-color: var(--muted) transparent;
-}
+   Inside `@layer base` deliberately: an unlayered declaration outranks every
+   layered one regardless of specificity, so a bare `a {}` here would silently beat
+   the `underline-offset-*` utilities on dialog and button links. The base layer
+   keeps them overridable, which is the whole point of putting them in it. */
+@layer base {
+  ::selection {
+    /* A tint of the amber accent rather than a flat block: at 34% over either
+       theme's background it stays legible without hiding the photo behind it. */
+    background: color-mix(in oklab, var(--primary) 34%, transparent);
+    color: var(--foreground);
+  }
 
-/* Keeps the UA's focus ring and only recolours it, so anything that does not go
-   through a shadcn control still matches the rest. Shadcn's own components drop
-   the outline and draw a ring instead, so they are unaffected. */
-:focus-visible {
-  outline-color: var(--ring);
-  outline-offset: 2px;
-}
+  html {
+    caret-color: var(--primary);
+    /* `--muted-foreground`, not `--muted`: in the light theme `--muted` is #f2ede6
+       against a #faf8f5 track — about 1.1:1, which makes the scrollbar disappear
+       on a page that scrolls tens of thousands of pixels. This is ~3.7:1 light and
+       ~2.4:1 dark. */
+    scrollbar-color: var(--muted-foreground) transparent;
+  }
 
-a {
-  /* Closer to the text than the UA default, and thin enough not to close up the
-     descenders. Only applies where there is an underline to begin with. */
-  text-underline-offset: 0.2em;
-  text-decoration-thickness: 1px;
+  /* Keeps the UA's focus ring and only recolours it, so anything that does not go
+     through a shadcn control still matches the rest. Shadcn's own components drop
+     the outline and draw a ring instead, so they are unaffected. */
+  :focus-visible {
+    outline-color: var(--ring);
+    outline-offset: 2px;
+  }
+
+  a {
+    /* Closer to the text than the UA default, and thin enough not to close up the
+       descenders. Only applies where there is an underline to begin with. */
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
 }

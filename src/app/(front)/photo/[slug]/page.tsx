@@ -7,6 +7,7 @@ import { MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatCamera, formatDate, formatExifLine, formatLocation } from "@/lib/format";
 import { PhotoActions } from "@/components/gallery/photo-actions";
+import { SITE_URL } from "@/lib/site";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -99,7 +100,7 @@ export default async function PhotoDetailPage({ params }: Props) {
             ].filter(Boolean),
             dateCreated: photo.dateTimeOriginal?.toISOString(),
             author: { "@type": "Person", name: "菠萝丁 (Owen)" },
-            url: `https://bldcam.page/photo/${photo.slug}`,
+            url: `${SITE_URL}/photo/${photo.slug}`,
           })
             // These fields come from the database — upload filenames, EXIF, AI text.
             // A `</script>` in any of them would close the tag, and React does not

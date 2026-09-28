@@ -68,8 +68,10 @@ export function ViewModeProvider({
       return;
     }
 
-    // Decide which cards may be snapshotted from the layout being left, and use
-    // that same set for both snapshots. See src/lib/view-transition-cards.ts.
+    // Which cards the transition is allowed to snapshot. See
+    // src/lib/view-transition-cards.ts for what the two sets are and why they
+    // differ — the first call limits the "before" snapshot, the call inside the
+    // callback limits the "after" one.
     const token = ++toggleToken.current;
     const nearOld = nearCardIds();
     markFarCards(nearOld);
@@ -83,9 +85,10 @@ export function ViewModeProvider({
     const transition = document.startViewTransition(() => {
       applied = true;
       flushSync(apply);
-      // The incoming cards are new DOM nodes, so the marking has to be redone
-      // before this returns and the "after" snapshot is taken — and it has to
-      // cover the new layout's own viewport, not just the old layout's.
+      // `data-vt-far` is imperative and React does not manage it, so it survives
+      // the switch on the reused nodes — and the incoming layout puts a different
+      // set of photos on screen anyway. Both are reasons the marking has to be
+      // redone here, before this returns and the "after" snapshot is taken.
       //
       // The two layouts are wildly different heights (waterfall ~7,400px, feed
       // ~64,600px), and the scroll offset is kept, so the viewport lands on

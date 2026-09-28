@@ -4,16 +4,24 @@
  *
  * Run with: node scripts/make-og-image.mjs
  *
- * The output is committed rather than generated at request time. That keeps the
- * fonts a build-time concern only: `next/og` would need a font file bundled into
- * the repo, and the site's real faces come from `next/font/google` and are not
- * available to a renderer. Rendering once here also means the card cannot fail in
- * production.
+ * **Must be run on this Mac.** sharp renders SVG text through the system font
+ * stack and cannot carry a font of its own, so a machine without the CJK faces
+ * below — a Linux CI box, a slim container — would rasterise the Chinese line as
+ * tofu. The output is committed, so that failure would be baked into the repo
+ * silently: the script would exit 0 and write a broken image. There is no runtime
+ * dependency on any of this; nothing outside this script reads a font.
+ *
+ * The output is committed rather than generated per request because `next/og`
+ * would need a font file bundled into the repo, and the site's real faces come
+ * from `next/font/google` and are not available to a renderer.
  *
  * Latin text uses Georgia (the site's heading face is Instrument Serif, which is
  * not installed locally — a serif keeps the register even though the face differs).
- * The Chinese line names Noto Sans SC explicitly; leaving it to a generic fallback
- * is how CJK text ends up as tofu.
+ * The Chinese line names Noto Sans SC and PingFang SC explicitly; leaving it to a
+ * generic fallback is how CJK text ends up as tofu.
+ *
+ * The domain printed on the card is display text, not a URL, so it is a copy of
+ * `SITE_URL` rather than a use of it — change both if the domain changes.
  */
 import sharp from "sharp";
 import { fileURLToPath } from "node:url";

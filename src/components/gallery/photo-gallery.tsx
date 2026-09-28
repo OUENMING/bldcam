@@ -7,8 +7,11 @@ import { MemoizedPhotoCard, type GalleryVariant } from "./photo-card";
 const WATERFALL =
   "columns-1 gap-4 min-[420px]:columns-2 min-[420px]:gap-3 md:columns-3 md:gap-4 lg:columns-4";
 
+// `sm:w-[88%]` matches what useImageDisplaySize assumes when it caps a frame at
+// `vw * 0.88` in the 640–1024px band. Without it the container is 92vw there, so
+// the computed frame came out narrower than the column it sits in.
 const FEED =
-  "mx-auto flex w-[92%] max-w-4xl flex-col items-center gap-10 sm:gap-16 md:gap-20";
+  "mx-auto flex w-[92%] sm:w-[88%] max-w-4xl flex-col items-center gap-10 sm:gap-16 md:gap-20";
 
 interface PhotoGalleryProps {
   photos: Photo[];

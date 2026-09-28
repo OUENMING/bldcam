@@ -51,10 +51,12 @@ function PhotoCard({
   const exifLine = formatExifLine(photo);
   const isFeed = variant === "feed";
 
-  // Called for both variants because a hook cannot be conditional. Cheap either
-  // way: it subscribes to one shared resize listener, not one per card. Only the
-  // feed branch reads the result, and only it needs the caption below the image.
-  const displaySize = useImageDisplaySize(photo.width, photo.height);
+  // Called for both variants because a hook cannot be conditional, but subscribed
+  // only for the feed branch — see the `enabled` option. Only the feed branch reads
+  // the result, and only it needs the caption below the image.
+  const displaySize = useImageDisplaySize(photo.width, photo.height, {
+    enabled: isFeed,
+  });
   const locationLine = isFeed ? formatLocation(photo) : "";
 
   // Typed as the union so one <Image> call site serves both layouts. Two call
@@ -95,7 +97,13 @@ function PhotoCard({
           ...(isFeed
             ? {
                 width: displaySize.width,
-                height: displaySize.height,
+                // Ratio rather than a fixed pixel height. `maxWidth` can narrow the
+                // box — a phone viewport, or the first render before the hook has
+                // measured anything and it is still on its 1920×1080 fallback — and
+                // a pinned height would then disagree with the photo's aspect, which
+                // `object-cover` can only resolve by cropping. Measured vertical
+                // portraits lost about 40% of their width that way.
+                aspectRatio: `${displaySize.width} / ${displaySize.height}`,
                 maxWidth: "100%",
               }
             : null),
@@ -147,7 +155,8 @@ function PhotoCard({
               )}
             />
             <div className="absolute inset-x-0 bottom-0 p-4">
-              <h3
+              {/* h2 to match the feed caption — same content, same level. */}
+              <h2
                 className={cn(
                   "font-semibold text-white text-lg leading-tight drop-shadow-md",
                   "translate-y-4 opacity-0 pointer-events-none",
@@ -174,7 +183,7 @@ function PhotoCard({
                 ) : (
                   photo.title
                 )}
-              </h3>
+              </h2>
               {exifLine && (
                 <p
                   className={cn(
@@ -195,8 +204,18 @@ function PhotoCard({
       {/* ── Feed caption: a panel below the image, always visible ── */}
       {isFeed && (
         <div className="shrink-0 space-y-0.5 py-3 text-center sm:space-y-1 sm:py-4">
+          {/* The title is the card's only keyboard route in — the frame is a div
+              with onClick and is not focusable. The waterfall card links its title
+              for the same reason; without this, keyboard users in feed mode could
+              reach neither the detail page nor the lightbox. */}
           <h2 className="font-semibold text-foreground text-base leading-tight sm:text-xl md:text-2xl">
-            {photo.title}
+            {photo.slug ? (
+              <Link href={`/photo/${photo.slug}`} className="hover:underline">
+                {photo.title}
+              </Link>
+            ) : (
+              photo.title
+            )}
           </h2>
 
           {exifLine && (

@@ -10,6 +10,11 @@ export function Header() {
 
   return (
     <header
+      // What globals.css keys `view-transition-name: site-header` on. Scoped by
+      // attribute because admin-console.tsx renders a <header> too, and two
+      // elements sharing a view-transition-name makes the browser drop the whole
+      // transition silently.
+      data-site-header
       className="sticky top-0 z-30 flex h-16 items-center justify-between bg-background/90 px-4 backdrop-blur-md sm:px-6 md:px-8"
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >

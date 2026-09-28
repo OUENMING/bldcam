@@ -10,6 +10,16 @@ interface DisplaySize {
 interface UseImageDisplaySizeOptions {
   /** Ratio of viewport height to use as max, default 0.8 (80vh) */
   maxHeightRatio?: number;
+  /**
+   * False when the caller will not read the result. Default true.
+   *
+   * Every instance subscribes to the shared resize listener and holds its own
+   * viewport state, so every instance re-renders on resize. The merged photo card
+   * has to call this for both layouts — hooks cannot be conditional — but only the
+   * feed branch reads the size, so in waterfall mode that subscription is 77 state
+   * updates per resize for nothing. Mobile address-bar show/hide fires resize too.
+   */
+  enabled?: boolean;
 }
 
 // ── Singleton resize listener (debounced, one global handler) ──
@@ -64,19 +74,20 @@ export function useImageDisplaySize(
   imageHeight: number,
   options: UseImageDisplaySizeOptions = {},
 ) {
-  const { maxHeightRatio } = options;
+  const { maxHeightRatio, enabled = true } = options;
 
   // Starts unmeasured so the server and the first client render agree: getViewport
   // touches window and returns the real size on the client, so initialising from it
-  // made the two disagree. The effect below syncs it right after mount, and every
-  // consumer already falls back to 1920×1080 while width/height are 0.
+  // made the two disagree. The effect below subscribes, and every consumer already
+  // falls back to 1920×1080 while width/height are 0.
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
   // Subscribe to the singleton resize listener
   useEffect(() => {
+    if (!enabled) return;
     const sync = () => setViewport(getViewport());
     return subscribeResize(sync);
-  }, []);
+  }, [enabled]);
 
   const displaySize: DisplaySize = useMemo(() => {
     // Guard: SSR or not yet measured
