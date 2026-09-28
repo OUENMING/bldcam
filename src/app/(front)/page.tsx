@@ -17,6 +17,13 @@ function first(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
+// Only the unfiltered case has no filter to name, which the nested ternary hid.
+function emptyHint(city?: string, category?: string): string {
+  if (city) return `"${city}" 还没有照片`;
+  if (category) return `"${category}" 分类还没有照片`;
+  return "还没有照片";
+}
+
 export default async function HomePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const city = first(params.city);
@@ -109,11 +116,7 @@ export default async function HomePage({ searchParams }: PageProps) {
             <div className="flex min-h-[60vh] items-center justify-center">
               <div className="text-center space-y-2">
                 <p className="text-muted-foreground">
-                  {city
-                    ? `"${city}" 还没有照片`
-                    : category
-                      ? `"${category}" 分类还没有照片`
-                      : "还没有照片"}
+                  {emptyHint(city, category)}
                 </p>
                 <p className="text-muted-foreground/60 text-sm">
                   去后台<Link href="/admin" className="underline">上传</Link>第一张吧
