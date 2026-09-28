@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "这里没有照片 · BLDcam",
+  // The root layout's title template appends "· BLDcam"; writing the suffix here
+  // too produced "这里没有照片 · BLDcam · BLDcam".
+  title: "这里没有照片",
 };
 
 /**
@@ -18,7 +20,10 @@ export default function NotFound() {
         <span className="font-normal italic tracking-wide text-primary">cam</span>
       </Link>
 
-      <p className="max-w-sm text-balance text-muted-foreground">
+      {/* max-w-lg rather than a narrower measure: `text-balance` has no notion of
+          Chinese word boundaries, so a tight column broke mid-phrase
+          ("…也许是链接写 / 错了…"). This width fits the line. */}
+      <p className="max-w-lg text-balance text-muted-foreground">
         这条路上没有照片。也许是链接写错了，也许那张已经被删掉了。
       </p>
 
