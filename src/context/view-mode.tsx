@@ -63,18 +63,26 @@ export function ViewModeProvider({
     // committed yet. Resetting the cards' reveal state for that capture is keyed
     // on the `:active-view-transition` pseudo-class (see globals.css), so there is
     // nothing to set here and nothing to clean up afterwards.
+    let applied = false;
     const transition = document.startViewTransition(() => {
+      applied = true;
       flushSync(apply);
     });
 
-    // A skipped transition — a second toggle arriving while this one runs —
-    // rejects the transition's promises with an AbortError. `ready` is never read
-    // by anything, so it leaked an unhandled rejection on every such click;
-    // `finished` needs its own catch too, because `finally` alone passes the
-    // rejection through to an unhandled promise. Measured with these removed:
-    // three rapid clicks produced two AbortErrors; catching `ready` as well
-    // brings that to zero. (`updateCallbackDone` does not reject here — measured.)
-    transition.ready.catch(() => {});
+    // `ready` rejects whenever the transition does not actually run, and in some
+    // of those cases the update callback never runs either — a hidden document
+    // does exactly that (reproduced: InvalidStateError, mode unchanged, cookie
+    // never written). Losing the animation there is acceptable; leaving a
+    // control that does nothing is not, so fall back to the plain update. When
+    // the callback did run this is a no-op.
+    //
+    // The same catch also handles the plain rejection leak: a skipped transition
+    // rejects both `ready` and `finished`, and nothing else reads them. Measured
+    // with these removed: three rapid clicks produced two unhandled AbortErrors.
+    // (`updateCallbackDone` does not reject — measured.)
+    transition.ready.catch(() => {
+      if (!applied) apply();
+    });
     transition.finished.catch(() => {});
   }, [mode]);
 
