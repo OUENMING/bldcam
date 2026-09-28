@@ -183,33 +183,30 @@
   animation: none;
 }
 
-/* Card reveal starts at opacity-0 and only lifts once its IntersectionObserver
-   fires, one frame after the browser has already captured the "after" snapshot.
-   The offset must be reset as `translate`, not `transform`: Tailwind v4 emits
-   `translate-y-4` as the standalone `translate` property, so `transform: none`
-   did nothing. Do not write both declarations — the minifier folds
-   `transform: none; translate: none` into `transform: translate(0)` and the
-   translate offset survives. The reveal element carries no transform utility,
-   so `translate` alone is the complete reset.
+/* The card entrance is an animation, not a state the card starts in. A card
+   parked at `opacity: 0` is exactly the frame a view transition's "after"
+   snapshot captures, which is what the old `html:active-view-transition
+   [data-reveal-card]` rules existed to undo — the hidden state simply does not
+   exist now, so nothing needs forcing back. `use-reveal.ts` adds this class only
+   to a card that mounted below the fold and has since scrolled in.
 
-   Keyed on `:active-view-transition` rather than an attribute we set from JS:
-   the filter changes are driven by React, so there is no JS hook to set an
-   attribute on that path, and it was only ever covering the view-mode toggle.
-   Measured during a React-driven filter transition without this: cards entered
-   the snapshot at `translate: 0px 32px` and `opacity: 0`. */
-html:active-view-transition [data-reveal-card] {
-  opacity: 1;
-  translate: none;
-  transition: none;
+   The rise is written in `translate`, not `transform`: Tailwind v4 emits its
+   offset utilities as the standalone `translate` property, and the old
+   `transition-[opacity,transform]` never animated it — the card faded in at its
+   final position and the rise never happened. */
+@keyframes card-reveal {
+  from {
+    opacity: 0;
+    translate: 0 16px;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+  }
 }
 
-/* The image has its own loading gate — blurred and desaturated on the waterfall
-   card, `opacity-0` on the feed card — and `isLoaded` only flips when `onLoad`
-   commits, after the snapshot. Without this the incoming snapshot holds blank or
-   blurred frames and the photo fades in from nothing. */
-html:active-view-transition [data-reveal-card] img {
-  opacity: 1;
-  filter: none;
+.card-reveal {
+  animation: card-reveal 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* The block above does not cover these: `*` matches elements, not pseudo-elements,

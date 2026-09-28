@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { memo, useState } from "react";
-import { useInViewOnce } from "@/hooks/use-in-view-once";
+import { memo } from "react";
+import { useReveal } from "@/hooks/use-reveal";
 import { cn } from "@/lib/utils";
 import { photoViewTransitionName } from "@/lib/view-mode";
 import { formatExifLine } from "@/lib/format";
@@ -24,20 +24,18 @@ interface PhotoCardProps {
 }
 
 function PhotoCard({ photo, index, priority = false, onOpen }: PhotoCardProps) {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const { ref, inView } = useInViewOnce();
+  const { ref, reveal } = useReveal();
   const exifLine = formatExifLine(photo);
 
   return (
     <div
       ref={ref}
-      data-reveal-card
+      // Visible unless the element mounted below the fold and has now scrolled
+      // in. Nothing here hides the card, so a broken image or a snapshot taken
+      // mid-transition can never produce an empty frame.
       className={cn(
         "mb-2 break-inside-avoid select-none sm:mb-3 md:mb-4",
-        inView && isLoaded
-          ? "translate-y-0 opacity-100"
-          : "translate-y-4 opacity-0",
-        "transition-[opacity,transform] duration-700 ease-out",
+        reveal && "card-reveal",
       )}
     >
       <div
@@ -55,7 +53,9 @@ function PhotoCard({ photo, index, priority = false, onOpen }: PhotoCardProps) {
       >
         {/* ── Image ──────────────────────────────── */}
         <Image
-          placeholder="blur"
+          // `placeholder="blur"` with no data URL throws inside next/image, and
+          // blurDataUrl is nullable in the schema.
+          placeholder={photo.blurDataUrl ? "blur" : "empty"}
           blurDataURL={photo.blurDataUrl ?? undefined}
           src={photo.thumbnailUrl || photo.url}
           width={photo.width}
@@ -63,15 +63,10 @@ function PhotoCard({ photo, index, priority = false, onOpen }: PhotoCardProps) {
           alt={photo.title}
           priority={priority}
           draggable={false}
-          onLoad={() => setIsLoaded(true)}
-          // A failed load left the card invisible rather than showing a broken or
-          // placeholder frame; reveal it either way.
-          onError={() => setIsLoaded(true)}
           className={cn(
             "h-auto w-full",
             "transition-transform duration-700 ease-out",
             "group-hover:scale-[1.03]",
-            isLoaded ? "" : "blur-md grayscale",
           )}
           sizes="(max-width: 420px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />

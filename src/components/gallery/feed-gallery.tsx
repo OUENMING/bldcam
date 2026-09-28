@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { memo, useState } from "react";
-import { useInViewOnce } from "@/hooks/use-in-view-once";
+import { memo } from "react";
+import { useReveal } from "@/hooks/use-reveal";
 import { cn } from "@/lib/utils";
 import { useImageDisplaySize } from "@/hooks/use-image-display-size";
 import { photoViewTransitionName } from "@/lib/view-mode";
@@ -14,11 +14,12 @@ import type { Photo } from "@prisma/client";
 // Uses useImageDisplaySize (ported from camlife) to compute
 // exact pixel dimensions for each photo.  The image container
 // gets inline width/height so Next.js <Image fill> can use
-// object-contain to scale-to-fit.
+// object-cover to scale-to-fill the box.
 //
 // Landscape → fills available width, height auto
 // Portrait  → height capped at 80vh, width scales down
-//             proportionally, dark sides appear naturally
+//             proportionally; the cap makes the box a
+//             different aspect than the photo, so it crops
 
 function FeedCard({
   photo,
@@ -31,8 +32,7 @@ function FeedCard({
   priority?: boolean;
   onOpen?: (index: number) => void;
 }) {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const { ref, inView } = useInViewOnce();
+  const { ref, reveal } = useReveal();
   const exifLine = formatExifLine(photo);
   const locationLine = formatLocation(photo);
 
@@ -41,13 +41,10 @@ function FeedCard({
   return (
     <div
       ref={ref}
-      data-reveal-card
+      // Same rule as the waterfall card — see use-reveal.ts.
       className={cn(
         "flex w-full flex-col items-center",
-        "transition-[opacity,transform] duration-700 ease-out",
-        inView && isLoaded
-          ? "translate-y-0 opacity-100"
-          : "translate-y-8 opacity-0",
+        reveal && "card-reveal",
       )}
     >
       {/* ── Image ────────────────────────────────── */}
@@ -64,20 +61,15 @@ function FeedCard({
       >
         <Image
           fill
-          placeholder="blur"
+          // `placeholder="blur"` with no data URL throws inside next/image, and
+          // blurDataUrl is nullable in the schema.
+          placeholder={photo.blurDataUrl ? "blur" : "empty"}
           blurDataURL={photo.blurDataUrl ?? undefined}
           src={photo.thumbnailUrl || photo.url}
           alt={photo.title}
           priority={priority}
           draggable={false}
-          onLoad={() => setIsLoaded(true)}
-          // Without this a failed request left isLoaded false forever: the image
-          // sat at opacity-0 and the user saw an empty frame with no error at all.
-          onError={() => setIsLoaded(true)}
-          className={cn(
-            "object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]",
-            isLoaded ? "opacity-100" : "opacity-0",
-          )}
+          className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]"
           sizes={`(min-width: 1024px) ${displaySize.width}px, (min-width: 640px) 88vw, 92vw`}
         />
       </div>
